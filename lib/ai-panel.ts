@@ -52,8 +52,8 @@ Return ONLY pure JSON with no markdown:
 
 async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
-    model: 'claude-3-5-sonnet-20240620', // Sử dụng ID model ổn định nhất của Anthropic
-    max_tokens: 900,
+    model: 'claude-3-5-sonnet-20240620',
+    max_tokens: 1000,
     system: SONNET_SYSTEM,
     messages: [{
       role: 'user',
@@ -63,7 +63,7 @@ async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Ima
       ],
     }],
   })
-  const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
+  const text = res.content.find(b => b.type === 'text' && 'text' in b)?.text ?? '{}'
   return {
     result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
     usage: res.usage,
@@ -72,7 +72,7 @@ async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Ima
 
 async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
-    model: 'claude-3-haiku-20240307', // Sử dụng ID model ổn định của Haiku
+    model: 'claude-3-haiku-20240307',
     max_tokens: 600,
     system: HAIKU_SYSTEM,
     messages: [{
@@ -83,7 +83,7 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
       ],
     }],
   })
-  const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
+  const text = res.content.find(b => b.type === 'text' && 'text' in b)?.text ?? '{}'
   return {
     result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
     usage: res.usage,
@@ -91,13 +91,18 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
 }
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
-  // Sửa lỗi: Cập nhật tên model thành 'gemini-1.5-flash-latest' để đảm bảo hoạt động với API v1beta
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' }) 
+  // Sửa lỗi 404: Chuyển sang Gemini 2.0 Flash bản Stable (v1) thay vì v1beta
+  const model = genAI.getGenerativeModel(
+    { model: 'gemini-2.0-flash' },
+    { apiVersion: 'v1' }
+  ) 
+  
   const parts = [
     { text: GEMINI_PROMPT },
     ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
     { text: 'Analyze and return JSON only.' },
   ]
+  
   const result = await model.generateContent(parts)
   const text = result.response.text()
   return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
@@ -156,7 +161,7 @@ export async function runAIPanel(images: Array<{
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0)
-  const costUsd      = inputTokens * 0.000003 + outputTokens * 0.000015
+  const costUsd      = (inputTokens * 0.000003) + (outputTokens * 0.000015)
 
   return {
     sonnet, haiku, gemini,
