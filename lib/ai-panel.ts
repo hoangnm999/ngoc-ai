@@ -44,9 +44,10 @@ const HAIKU_SYSTEM = `Bạn là chuyên gia xác thực ngọc đá quý, chuyê
 Trả về JSON THUẦN TÚY:
 {"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","can_bao":"","do_tin_cay":70}`
 
-const GEMINI_PROMPT = `You are an expert gemologist. Analyze these gemstone images objectively.
-Return ONLY pure JSON. Do not include any text outside the JSON object:
-{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","do_tin_cay":70}`
+const GEMINI_PROMPT = `As an expert gemologist, analyze these images. 
+Focus on stone type, estimated value in VND, and quality grade.
+Output MUST be a valid JSON object only.
+Template: {"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Khá","nhan_xet":"","do_tin_cay":70}`
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
@@ -92,19 +93,20 @@ async function callHaiku(imageBlocks: any[]) {
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   try {
-    // 1. Kiểm tra API key
     if (!process.env.GEMINI_API_KEY) {
-      console.error('[Gemini] Lỗi: Thiếu API Key trong biến môi trường');
+      console.error('[Gemini] Missing API Key');
       return null;
     }
 
-    // 2. Cấu hình Model với JSON Mode và tắt bộ lọc an toàn để tránh chặn nhầm ảnh đá quý
     const model = genAI.getGenerativeModel(
       { 
         model: 'gemini-1.5-flash-latest',
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.1, // Giảm tối đa sự sáng tạo để đảm bảo cấu trúc JSON
+          temperature: 0.1,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 1024,
         },
         safetySettings: [
           { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -116,29 +118,39 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
       { apiVersion: 'v1beta' }
     ) 
     
-    // 3. Chuẩn bị dữ liệu gửi đi (Prompt + Ảnh)
     const parts = [
       { text: GEMINI_PROMPT },
-      ...base64Images.map(img => ({ 
-        inlineData: { 
-          data: img.data, 
-          mimeType: img.mimeType 
-        } 
-      })),
+      ...base64Images.map(img => {
+        // Đảm bảo loại bỏ tiền tố data:nếu có để tránh lỗi API
+        const cleanData = img.data.includes(',') ? img.data.split(',')[1] : img.data;
+        return { 
+          inlineData: { 
+            data: cleanData, 
+            mimeType: img.mimeType 
+          } 
+        };
+      }),
     ]
     
-    // 4. Gọi API
     const result = await model.generateContent(parts)
-    const text = result.response.text()
+    const response = await result.response;
+    const text = response.text()
     
     if (!text || text.trim() === "") {
-      console.warn('[Gemini] Cảnh báo: AI trả về nội dung rỗng');
+      console.warn('[Gemini] Empty response');
       return null;
     }
     
-    // 5. Parse và trả về kết quả
-    const cleanJson = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleanJson) as AIResult;
+    // Logic bóc tách JSON an toàn hơn
+    let jsonStr = text.trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+    
+    return JSON.parse(jsonStr) as AIResult;
     
   } catch (err: any) {
     console.error('[Gemini Error Details]', err);
