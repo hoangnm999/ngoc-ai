@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { runAIPanel } from '@/lib/ai-panel'
 
-const XU_PER_APPRAISAL = 2
+const XU_PER_APPRAISAL = 0
 
 export async function POST(req: NextRequest) {
   try {
