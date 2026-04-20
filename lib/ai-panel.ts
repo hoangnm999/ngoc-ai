@@ -127,13 +127,13 @@ export async function runAIPanel(images: Array<{
   label: string
 }>): Promise<PanelResult> {
   // Build Anthropic image blocks
-  const anthropicBlocks: Anthropic.ImageBlockParam[] = images.flatMap(img => ([
+  const anthropicBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = images.flatMap(img => ([
     { type: 'text' as const, text: `[${img.label}]` },
     {
       type: 'image' as const,
       source: { type: 'base64' as const, media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', data: img.b64 },
     },
-  ]))
+  ]));
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
