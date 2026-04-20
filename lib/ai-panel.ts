@@ -1,6 +1,6 @@
 // lib/ai-panel.ts — Chỉ chạy ở Server-side
 import Anthropic from '@anthropic-ai/sdk'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const genAI     = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -92,13 +92,25 @@ async function callHaiku(imageBlocks: any[]) {
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   try {
-    // Sửa lỗi 404 & Empty Result: Sử dụng gemini-1.5-flash-latest với v1beta và JSON Mode
+    // Kiểm tra API key tồn tại
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('[Gemini] Missing API Key in environment variables');
+      return null;
+    }
+
     const model = genAI.getGenerativeModel(
       { 
         model: 'gemini-1.5-flash-latest',
         generationConfig: {
           responseMimeType: "application/json",
-        }
+          temperature: 0.2, // Giảm độ nhiễu để kết quả JSON ổn định hơn
+        },
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
       },
       { apiVersion: 'v1beta' }
     ) 
@@ -111,13 +123,18 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
     const result = await model.generateContent(parts)
     const text = result.response.text()
     
-    if (!text) return null
+    if (!text || text.trim() === "") {
+      console.warn('[Gemini] Received empty response text');
+      return null;
+    }
     
-    return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
+    // Làm sạch chuỗi trước khi parse
+    const cleanJson = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanJson) as AIResult;
+    
   } catch (err: any) {
-    // Nếu hết hạn mức (429) hoặc lỗi API, trả về null để Panel vẫn hiển thị kết quả từ Claude
-    console.error('[Gemini Error]', err.message)
-    return null
+    console.error('[Gemini Error Details]', err);
+    return null;
   }
 }
 
@@ -175,7 +192,6 @@ export async function runAIPanel(images: Array<{
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0)
   
-  // Chi phí ước tính (Sonnet + Haiku)
   const costUsd = (inputTokens * 0.000003) + (outputTokens * 0.000015)
 
   return {
