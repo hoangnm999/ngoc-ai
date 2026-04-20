@@ -92,18 +92,19 @@ async function callHaiku(imageBlocks: any[]) {
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   try {
-    // Kiểm tra API key tồn tại
+    // 1. Kiểm tra API key
     if (!process.env.GEMINI_API_KEY) {
-      console.error('[Gemini] Missing API Key in environment variables');
+      console.error('[Gemini] Lỗi: Thiếu API Key trong biến môi trường');
       return null;
     }
 
+    // 2. Cấu hình Model với JSON Mode và tắt bộ lọc an toàn để tránh chặn nhầm ảnh đá quý
     const model = genAI.getGenerativeModel(
       { 
         model: 'gemini-1.5-flash-latest',
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.2, // Giảm độ nhiễu để kết quả JSON ổn định hơn
+          temperature: 0.1, // Giảm tối đa sự sáng tạo để đảm bảo cấu trúc JSON
         },
         safetySettings: [
           { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -115,20 +116,27 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
       { apiVersion: 'v1beta' }
     ) 
     
+    // 3. Chuẩn bị dữ liệu gửi đi (Prompt + Ảnh)
     const parts = [
       { text: GEMINI_PROMPT },
-      ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
+      ...base64Images.map(img => ({ 
+        inlineData: { 
+          data: img.data, 
+          mimeType: img.mimeType 
+        } 
+      })),
     ]
     
+    // 4. Gọi API
     const result = await model.generateContent(parts)
     const text = result.response.text()
     
     if (!text || text.trim() === "") {
-      console.warn('[Gemini] Received empty response text');
+      console.warn('[Gemini] Cảnh báo: AI trả về nội dung rỗng');
       return null;
     }
     
-    // Làm sạch chuỗi trước khi parse
+    // 5. Parse và trả về kết quả
     const cleanJson = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleanJson) as AIResult;
     
