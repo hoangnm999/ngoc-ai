@@ -1,4 +1,4 @@
-// lib/ai-panel.ts — Server-side only
+// lib/ai-panel.ts — Chỉ chạy ở Server-side
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -46,11 +46,11 @@ Trả về JSON THUẦN TÚY:
 
 const GEMINI_PROMPT = `You are an expert gemologist. Analyze these gemstone images objectively.
 Return ONLY pure JSON with no markdown:
-{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tot","nhan_xet":"","do_tin_cay":70,"ghi_chu":""}`
+{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","do_tin_cay":70}`
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
-async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
+async function callSonnet(imageBlocks: any[]) {
   const res = await anthropic.messages.create({
     model: 'claude-3-5-sonnet-20240620',
     max_tokens: 1000,
@@ -59,7 +59,7 @@ async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Ima
       role: 'user',
       content: [
         ...imageBlocks,
-        { type: 'text', text: 'Phân tích và định giá viên ngọc/đá quý này.' },
+        { type: 'text', text: 'Hãy phân tích chi tiết và định giá viên đá này.' },
       ],
     }],
   })
@@ -70,7 +70,7 @@ async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Ima
   }
 }
 
-async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
+async function callHaiku(imageBlocks: any[]) {
   const res = await anthropic.messages.create({
     model: 'claude-3-haiku-20240307',
     max_tokens: 600,
@@ -79,7 +79,7 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
       role: 'user',
       content: [
         ...imageBlocks,
-        { type: 'text', text: 'Kiểm tra tính xác thực và định giá nhanh.' },
+        { type: 'text', text: 'Xác thực nhanh và đưa ra nhận xét về tính tự nhiên.' },
       ],
     }],
   })
@@ -91,21 +91,26 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
 }
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
-  // Sửa lỗi 404: Chuyển sang Gemini 2.0 Flash bản Stable (v1) thay vì v1beta
-  const model = genAI.getGenerativeModel(
-    { model: 'gemini-1.5-flash' },
-    { apiVersion: 'v1' }
-  ) 
-  
-  const parts = [
-    { text: GEMINI_PROMPT },
-    ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
-    { text: 'Analyze and return JSON only.' },
-  ]
-  
-  const result = await model.generateContent(parts)
-  const text = result.response.text()
-  return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
+  try {
+    // Sửa lỗi 404 & 429: Sử dụng model ổn định nhất với endpoint v1beta
+    const model = genAI.getGenerativeModel(
+      { model: 'gemini-1.5-flash-latest' },
+      { apiVersion: 'v1beta' }
+    ) 
+    
+    const parts = [
+      { text: GEMINI_PROMPT },
+      ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
+    ]
+    
+    const result = await model.generateContent(parts)
+    const text = result.response.text()
+    return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
+  } catch (err: any) {
+    // Nếu hết hạn mức hoặc lỗi API, trả về null để không làm lỗi cả hệ thống
+    console.error('[Gemini Error]', err.message)
+    return null
+  }
 }
 
 // ── Consensus builder ─────────────────────────────────────────────────────────
@@ -132,13 +137,13 @@ export async function runAIPanel(images: Array<{
   mimeType: string
   label: string
 }>): Promise<PanelResult> {
-  const anthropicBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = images.flatMap(img => ([
-    { type: 'text' as const, text: `[${img.label}]` },
+  const anthropicBlocks: any[] = images.flatMap(img => ([
+    { type: 'text', text: `[Ảnh: ${img.label}]` },
     {
-      type: 'image' as const,
+      type: 'image',
       source: { 
-        type: 'base64' as const, 
-        media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', 
+        type: 'base64', 
+        media_type: img.mimeType as any, 
         data: img.b64 
       },
     },
@@ -146,6 +151,7 @@ export async function runAIPanel(images: Array<{
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
+  // Gọi 3 AI song song bằng Promise.allSettled để đảm bảo 1 AI lỗi thì các AI khác vẫn chạy
   const [r1, r2, r3] = await Promise.allSettled([
     callSonnet(anthropicBlocks),
     callHaiku(anthropicBlocks),
@@ -155,7 +161,7 @@ export async function runAIPanel(images: Array<{
   const errors: Record<string, string> = {}
   const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message, null)
   const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message, null)
-  const gemini = r3.status === 'fulfilled' ? r3.value          : (errors.gemini = r3.reason?.message, null)
+  const gemini = r3.status === 'fulfilled' ? r3.value : (errors.gemini = r3.reason?.message, null)
 
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
