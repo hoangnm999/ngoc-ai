@@ -139,8 +139,8 @@ export async function runAIPanel(images: Array<{
 
   // Gọi 3 AI song song
   const [r1, r2, r3] = await Promise.allSettled([
-    callSonnet(anthropicBlocks),
-    callHaiku(anthropicBlocks),
+    async function callSonnet(blocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]),
+    async function callHaiku(blocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]),
     callGemini(geminiImages),
   ])
 
