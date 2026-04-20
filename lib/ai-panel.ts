@@ -50,10 +50,9 @@ Return ONLY pure JSON with no markdown:
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
-// Cập nhật kiểu dữ liệu ở tham số để nhận được cả Text và Image blocks
 async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-5-sonnet-20240620', // Sử dụng ID model ổn định nhất của Anthropic
     max_tokens: 900,
     system: SONNET_SYSTEM,
     messages: [{
@@ -73,7 +72,7 @@ async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Ima
 
 async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-3-haiku-20240307', // Sử dụng ID model ổn định của Haiku
     max_tokens: 600,
     system: HAIKU_SYSTEM,
     messages: [{
@@ -92,7 +91,8 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
 }
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  // Sửa lỗi: Cập nhật tên model thành 'gemini-1.5-flash-latest' để đảm bảo hoạt động với API v1beta
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' }) 
   const parts = [
     { text: GEMINI_PROMPT },
     ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
@@ -141,7 +141,6 @@ export async function runAIPanel(images: Array<{
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  // Gọi các hàm đã định nghĩa ở trên, không khai báo lại async function ở đây
   const [r1, r2, r3] = await Promise.allSettled([
     callSonnet(anthropicBlocks),
     callHaiku(anthropicBlocks),
