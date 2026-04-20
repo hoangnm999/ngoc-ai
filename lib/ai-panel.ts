@@ -93,7 +93,7 @@ async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.Imag
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   // Sửa lỗi 404: Chuyển sang Gemini 2.0 Flash bản Stable (v1) thay vì v1beta
   const model = genAI.getGenerativeModel(
-    { model: 'gemini-2.0-flash' },
+    { model: 'gemini-1.5-flash' },
     { apiVersion: 'v1' }
   ) 
   
