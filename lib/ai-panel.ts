@@ -1,6 +1,6 @@
 // lib/ai-panel.ts — Chỉ chạy ở Server-side
 import Anthropic from '@anthropic-ai/sdk'
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const genAI     = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -94,54 +94,44 @@ async function callHaiku(imageBlocks: any[]) {
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   try {
     if (!process.env.GEMINI_API_KEY) {
-      console.error('[Gemini] Missing API Key');
+      console.error('[Gemini Error] Thiếu API Key trong biến môi trường');
       return null;
     }
 
-    const model = genAI.getGenerativeModel(
-      { 
-        model: 'gemini-1.5-flash-latest',
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-          topP: 0.95,
-          topK: 40,
-          maxOutputTokens: 1024,
-        },
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-      },
-      { apiVersion: 'v1beta' }
-    ) 
+    // Lược bỏ các cấu hình gây lỗi xung đột API (safetySettings, responseMimeType, apiVersion)
+    // Trở về thiết lập mặc định nguyên bản, an toàn nhất cho mọi phiên bản SDK.
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+    });
     
-    const parts = [
-      { text: GEMINI_PROMPT },
-      ...base64Images.map(img => {
-        // Đảm bảo loại bỏ tiền tố data:nếu có để tránh lỗi API
-        const cleanData = img.data.includes(',') ? img.data.split(',')[1] : img.data;
-        return { 
-          inlineData: { 
-            data: cleanData, 
-            mimeType: img.mimeType 
-          } 
-        };
-      }),
-    ]
+    const parts: any[] = [
+      { text: GEMINI_PROMPT }
+    ];
+
+    for (const img of base64Images) {
+      // Đảm bảo loại bỏ tiền tố Base64 một cách an toàn nhất
+      let cleanData = img.data;
+      if (cleanData.includes(',')) {
+        cleanData = cleanData.split(',')[1];
+      }
+      
+      parts.push({
+        inlineData: {
+          data: cleanData,
+          mimeType: img.mimeType || 'image/jpeg'
+        }
+      });
+    }
     
-    const result = await model.generateContent(parts)
-    const response = await result.response;
-    const text = response.text()
+    const result = await model.generateContent(parts);
+    const text = result.response.text();
     
     if (!text || text.trim() === "") {
-      console.warn('[Gemini] Empty response');
+      console.warn('[Gemini Error] AI trả về chuỗi rỗng');
       return null;
     }
     
-    // Logic bóc tách JSON an toàn hơn
+    // Logic bóc tách JSON an toàn phòng trường hợp AI chèn chữ bên ngoài
     let jsonStr = text.trim();
     const firstBrace = jsonStr.indexOf('{');
     const lastBrace = jsonStr.lastIndexOf('}');
@@ -153,7 +143,8 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
     return JSON.parse(jsonStr) as AIResult;
     
   } catch (err: any) {
-    console.error('[Gemini Error Details]', err);
+    // Log chi tiết thông báo lỗi thực tế từ Google
+    console.error('[Gemini Error Details]', err.message || err);
     return null;
   }
 }
