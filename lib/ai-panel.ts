@@ -1,9 +1,11 @@
 // lib/ai-panel.ts — Chỉ chạy ở Server-side
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import OpenAI from 'openai'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const genAI     = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
 export interface AIResult {
   loai_da: string
@@ -18,7 +20,7 @@ export interface AIResult {
 }
 
 export interface PanelResult {
-  sonnet:    AIResult | null
+  gpt:       AIResult | null
   haiku:     AIResult | null
   gemini:    AIResult | null
   consensus: ConsensusResult | null
@@ -36,37 +38,49 @@ export interface ConsensusResult {
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
-const SONNET_SYSTEM = `Bạn là chuyên gia định giá ngọc đá quý 20 năm kinh nghiệm, chuyên thị trường Việt Nam.
+const GPT_SYSTEM = `Bạn là chuyên gia định giá ngọc đá quý 20 năm kinh nghiệm, chuyên thị trường Việt Nam.
 Phân tích TỔNG HỢP tất cả ảnh được cung cấp. Trả về JSON THUẦN TÚY (không markdown):
-{"loai_da":"","chat_luong":{"mau_sac":{"diem":0,"mo_ta":""},"do_trong":{"diem":0,"mo_ta":""},"van_da":{"diem":0,"mo_ta":""},"khuyet_diem":{"diem":0,"mo_ta":""},"nuoc_da":{"diem":0,"mo_ta":""},"gia_cong":{"diem":0,"mo_ta":""}},"gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","canh_bao":"","do_tin_cay":75}`
+{"loai_da":"","chat_luong":{"mau_sac":{"diem":0,"mo_ta":""},"do_trong":{"diem":0,"mo_ta":""},"van_da":{"diem":0,"mo_ta":""},"khuyet_diem":{"diem":0,"mo_ta":""},"nuoc_da":{"diem":0,"mo_ta":""},"gia_cong":{"diem":0,"mo_ta":""}},"gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","can_bao":"","do_tin_cay":85}`
 
 const HAIKU_SYSTEM = `Bạn là chuyên gia xác thực ngọc đá quý, chuyên phát hiện hàng giả và xử lý hóa học.
 Trả về JSON THUẦN TÚY:
-{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","canh_bao":"","do_tin_cay":70}`
+{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","can_bao":"","do_tin_cay":70}`
 
 const GEMINI_PROMPT = `You are an expert gemologist. Analyze these gemstone images objectively.
-Return ONLY pure JSON with no markdown:
+Return ONLY pure JSON. Do not include any text outside the JSON object:
 {"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","do_tin_cay":70}`
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
-async function callSonnet(imageBlocks: any[]) {
-  const res = await anthropic.messages.create({
-    model: 'claude-3-5-sonnet-20240620',
-    max_tokens: 1000,
-    system: SONNET_SYSTEM,
-    messages: [{
-      role: 'user',
-      content: [
-        ...imageBlocks,
-        { type: 'text', text: 'Hãy phân tích chi tiết và định giá viên đá này.' },
-      ],
-    }],
+async function callGPT(images: Array<{ b64: string; mimeType: string; label: string }>) {
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: GPT_SYSTEM,
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Hãy phân tích chi tiết và định giá viên đá này." },
+          ...images.map(img => ({
+            type: "image_url" as const,
+            image_url: { url: `data:${img.mimeType};base64,${img.b64}` }
+          }))
+        ],
+      },
+    ],
+    response_format: { type: "json_object" }
   })
-  const text = res.content.find(b => b.type === 'text' && 'text' in b)?.text ?? '{}'
+
+  const text = res.choices[0].message.content ?? '{}'
   return {
-    result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
-    usage: res.usage,
+    result: JSON.parse(text) as AIResult,
+    usage: {
+      input_tokens: res.usage?.prompt_tokens ?? 0,
+      output_tokens: res.usage?.completion_tokens ?? 0
+    }
   }
 }
 
@@ -92,9 +106,13 @@ async function callHaiku(imageBlocks: any[]) {
 
 async function callGemini(base64Images: Array<{ data: string; mimeType: string }>) {
   try {
-    // Sửa lỗi 404 & 429: Sử dụng model ổn định nhất với endpoint v1beta
     const model = genAI.getGenerativeModel(
-      { model: 'gemini-1.5-flash-latest' },
+      { 
+        model: 'gemini-1.5-flash-latest',
+        generationConfig: {
+          responseMimeType: "application/json",
+        }
+      },
       { apiVersion: 'v1beta' }
     ) 
     
@@ -105,9 +123,10 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
     
     const result = await model.generateContent(parts)
     const text = result.response.text()
+    if (!text) throw new Error("Empty response from Gemini")
+    
     return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
   } catch (err: any) {
-    // Nếu hết hạn mức hoặc lỗi API, trả về null để không làm lỗi cả hệ thống
     console.error('[Gemini Error]', err.message)
     return null
   }
@@ -137,6 +156,7 @@ export async function runAIPanel(images: Array<{
   mimeType: string
   label: string
 }>): Promise<PanelResult> {
+  // Chuẩn bị blocks cho Anthropic
   const anthropicBlocks: any[] = images.flatMap(img => ([
     { type: 'text', text: `[Ảnh: ${img.label}]` },
     {
@@ -151,15 +171,14 @@ export async function runAIPanel(images: Array<{
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  // Gọi 3 AI song song bằng Promise.allSettled để đảm bảo 1 AI lỗi thì các AI khác vẫn chạy
   const [r1, r2, r3] = await Promise.allSettled([
-    callSonnet(anthropicBlocks),
+    callGPT(images), // Đã đổi Sonnet sang GPT-4o
     callHaiku(anthropicBlocks),
     callGemini(geminiImages),
   ])
 
   const errors: Record<string, string> = {}
-  const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message, null)
+  const gpt    = r1.status === 'fulfilled' ? r1.value.result : (errors.gpt = r1.reason?.message, null)
   const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message, null)
   const gemini = r3.status === 'fulfilled' ? r3.value : (errors.gemini = r3.reason?.message, null)
 
@@ -167,11 +186,13 @@ export async function runAIPanel(images: Array<{
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0)
-  const costUsd      = (inputTokens * 0.000003) + (outputTokens * 0.000015)
+  
+  // Chi phí ước tính (GPT-4o + Haiku)
+  const costUsd = (inputTokens * 0.000005) + (outputTokens * 0.000015)
 
   return {
-    sonnet, haiku, gemini,
-    consensus: buildConsensus([sonnet, haiku, gemini]),
+    gpt, haiku, gemini,
+    consensus: buildConsensus([gpt, haiku, gemini]),
     usage: { input_tokens: inputTokens, output_tokens: outputTokens, cost_usd: costUsd },
     errors,
   }
