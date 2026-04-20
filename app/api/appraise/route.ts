@@ -26,14 +26,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Kiểm tra & trừ xu (TẠM TẮT ĐỂ TEST AI)
-    /* const admin = createAdminClient()
+     const admin = createAdminClient()
     const { data: deducted, error: deductError } = await admin
       .rpc('deduct_xu', { p_user_id: user.id, p_amount: XU_PER_APPRAISAL })
 
     if (deductError || !deducted) {
       return NextResponse.json({ error: 'Không đủ xu. Vui lòng nạp thêm.' }, { status: 402 })
     }
-    */
+    
 
     // 4. Gọi 3 AI song song 
     const panelResult = await runAIPanel(images)
