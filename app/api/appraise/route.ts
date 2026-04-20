@@ -5,7 +5,7 @@ import { runAIPanel } from '@/lib/ai-panel'
 
 const XU_PER_APPRAISAL = 2
 // Danh sách email admin không bị trừ xu
-const ADMIN_EMAILS = ['admin@example.com', 'your-email@gmail.com']
+const ADMIN_EMAILS = ['hoangnm010@gmail.com', 'your-email@gmail.com']
 
 export async function POST(req: NextRequest) {
   try {
