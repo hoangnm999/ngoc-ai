@@ -9,22 +9,23 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18",
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.0",
     "@anthropic-ai/sdk": "^0.27.0",
     "@google/generative-ai": "^0.19.0",
-    "@supabase/ssr": "^0.5.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "next": "14.2.5",
-    "qs": "^6.13.0",
-    "react": "^18",
-    "react-dom": "^18"
+    "crypto": "^1.0.1",
+    "qs": "^6.13.0"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/qs": "^6.9.15",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/qs": "^6.9.15",
+    "typescript": "^5",
     "eslint": "^8",
-    "eslint-config-next": "14.2.5",
-    "typescript": "^5"
+    "eslint-config-next": "14.2.5"
   }
 }
