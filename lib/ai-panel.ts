@@ -1,4 +1,4 @@
-// lib/ai-panel.ts — Server-side only, API keys không bao giờ ra client
+// lib/ai-panel.ts — Server-side only
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -31,7 +31,7 @@ export interface ConsensusResult {
   cao:          number
   xep_hang:     string
   do_tin_cay:   number
-  agreement:    number  // số AI đồng thuận về xep_hang
+  agreement:    number 
 }
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
@@ -50,7 +50,8 @@ Return ONLY pure JSON with no markdown:
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
-async function callSonnet(imageBlocks: Anthropic.ImageBlockParam[]) {
+// Cập nhật kiểu dữ liệu ở tham số để nhận được cả Text và Image blocks
+async function callSonnet(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 900,
@@ -70,7 +71,7 @@ async function callSonnet(imageBlocks: Anthropic.ImageBlockParam[]) {
   }
 }
 
-async function callHaiku(imageBlocks: Anthropic.ImageBlockParam[]) {
+async function callHaiku(imageBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]) {
   const res = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 600,
@@ -126,21 +127,24 @@ export async function runAIPanel(images: Array<{
   mimeType: string
   label: string
 }>): Promise<PanelResult> {
-  // Build Anthropic image blocks
   const anthropicBlocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = images.flatMap(img => ([
     { type: 'text' as const, text: `[${img.label}]` },
     {
       type: 'image' as const,
-      source: { type: 'base64' as const, media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', data: img.b64 },
+      source: { 
+        type: 'base64' as const, 
+        media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', 
+        data: img.b64 
+      },
     },
   ]));
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  // Gọi 3 AI song song
+  // Gọi các hàm đã định nghĩa ở trên, không khai báo lại async function ở đây
   const [r1, r2, r3] = await Promise.allSettled([
-    async function callSonnet(blocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]),
-    async function callHaiku(blocks: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]),
+    callSonnet(anthropicBlocks),
+    callHaiku(anthropicBlocks),
     callGemini(geminiImages),
   ])
 
@@ -149,7 +153,6 @@ export async function runAIPanel(images: Array<{
   const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message, null)
   const gemini = r3.status === 'fulfilled' ? r3.value          : (errors.gemini = r3.reason?.message, null)
 
-  // Token usage (chỉ Claude)
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
