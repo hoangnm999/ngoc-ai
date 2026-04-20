@@ -3,21 +3,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { runAIPanel } from '@/lib/ai-panel'
 
-const XU_PER_APPRAISAL = 2
-// Danh sách email admin không bị trừ xu
-const ADMIN_EMAILS = ['hoangnm010@gmail.com', 'hoangnm010@gmail.com']
+// Thiết lập phí bằng 0 để ghi nhận vào lịch sử
+const XU_PER_APPRAISAL = 0
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Xác thực user
+    // 1. Xác thực user (Vẫn giữ để biết ai đang dùng hệ thống)
     const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 })
     }
-
-    // Kiểm tra quyền admin
-    const isAdmin = user.email ? ADMIN_EMAILS.includes(user.email) : false
 
     // 2. Parse body
     const body = await req.json()
@@ -30,29 +26,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cần ít nhất 3 ảnh' }, { status: 400 })
     }
 
+    // 3. BỎ QUA BƯỚC TRỪ XU
+    // Chúng ta không gọi hàm rpc('deduct_xu') nữa để bất kỳ ai cũng có thể sử dụng.
     const admin = createAdminClient()
-    let xuUsed = XU_PER_APPRAISAL
 
-    // 3. Kiểm tra & trừ xu (Bỏ qua nếu là Admin)
-    if (!isAdmin) {
-      const { data: deducted, error: deductError } = await admin
-        .rpc('deduct_xu', { p_user_id: user.id, p_amount: XU_PER_APPRAISAL })
-
-      if (deductError || !deducted) {
-        return NextResponse.json({ error: 'Không đủ xu. Vui lòng nạp thêm.' }, { status: 402 })
-      }
-    } else {
-      // Nếu là admin, ghi nhận 0 xu được sử dụng
-      xuUsed = 0
-    }
-
-    // 4. Gọi 3 AI song song
+    // 4. Gọi 3 AI song song (API keys an toàn ở server)
     const panelResult = await runAIPanel(images)
 
     // 5. Lưu kết quả vào DB
     await admin.from('appraisals').insert({
       user_id:              user.id,
-      xu_used:              xuUsed, // Lưu 0 nếu là admin
+      xu_used:              XU_PER_APPRAISAL, // Ghi nhận là 0 xu
       images_count:         images.filter(i => !i.label.includes('frame')).length,
       has_video:            hasVideo,
       result_sonnet:        panelResult.sonnet,
@@ -65,7 +49,7 @@ export async function POST(req: NextRequest) {
       stone_type:           panelResult.sonnet?.loai_da || panelResult.haiku?.loai_da,
     })
 
-    // 6. Lấy số xu còn lại
+    // 6. Lấy số dư xu hiện tại (chỉ để hiển thị cho đẹp giao diện)
     const { data: profile } = await admin
       .from('profiles')
       .select('xu')
@@ -75,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...panelResult,
       xu_remaining: profile?.xu ?? 0,
-      is_admin_mode: isAdmin // Thông báo thêm nếu cần
+      message: "Chế độ sử dụng miễn phí đang được kích hoạt"
     })
 
   } catch (err: unknown) {
