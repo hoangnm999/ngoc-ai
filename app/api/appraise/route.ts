@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { runAIPanel } from '@/lib/ai-panel'
 
-// Thiết lập phí bằng 0 để ghi nhận vào lịch sử
-const XU_PER_APPRAISAL = 0
+const XU_PER_APPRAISAL = 2
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Xác thực user (Vẫn giữ để biết ai đang dùng hệ thống)
+    // 1. Xác thực user
     const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -17,26 +16,43 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse body
     const body = await req.json()
-    const { images, hasVideo } = body as {
+    const { images, hasVideo, declarationContext, declaration } = body as {
       images: Array<{ b64: string; mimeType: string; label: string }>
       hasVideo: boolean
+      declarationContext?: string
+      declaration?: Record<string, unknown>
     }
 
     if (!images || images.length < 3) {
       return NextResponse.json({ error: 'Cần ít nhất 3 ảnh' }, { status: 400 })
     }
 
-    // 3. BỎ QUA BƯỚC TRỪ XU
-    // Chúng ta không gọi hàm rpc('deduct_xu') nữa để bất kỳ ai cũng có thể sử dụng.
+    // 3. Gọi AI phân tích TRƯỚC (chưa trừ xu)
+    const panelResult = await runAIPanel(images, declarationContext)
+    
+    // 4. Kiểm tra nếu AI lỗi
+    if (panelResult.errors && Object.keys(panelResult.errors).length > 0) {
+      // AI fail nhưng chưa trừ xu -> an toàn trả về lỗi
+      return NextResponse.json({ 
+        error: 'AI analysis failed', 
+        details: panelResult.errors,
+        message: 'Vui lòng thử lại sau'
+      }, { status: 500 })
+    }
+
+    // 5. SAU KHI AI THÀNH CÔNG: kiểm tra & trừ xu
     const admin = createAdminClient()
+    const { data: deducted, error: deductError } = await admin
+      .rpc('deduct_xu', { p_user_id: user.id, p_amount: XU_PER_APPRAISAL })
 
-    // 4. Gọi 3 AI song song (API keys an toàn ở server)
-    const panelResult = await runAIPanel(images)
+    if (deductError || !deducted) {
+      return NextResponse.json({ error: 'Không đủ xu. Vui lòng nạp thêm.' }, { status: 402 })
+    }
 
-    // 5. Lưu kết quả vào DB
+    // 6. Lưu kết quả vào DB
     await admin.from('appraisals').insert({
       user_id:              user.id,
-      xu_used:              XU_PER_APPRAISAL, // Ghi nhận là 0 xu
+      xu_used:              XU_PER_APPRAISAL,
       images_count:         images.filter(i => !i.label.includes('frame')).length,
       has_video:            hasVideo,
       result_sonnet:        panelResult.sonnet,
@@ -47,19 +63,16 @@ export async function POST(req: NextRequest) {
       consensus_price_high: panelResult.consensus?.cao,
       consensus_confidence: panelResult.consensus?.do_tin_cay,
       stone_type:           panelResult.sonnet?.loai_da || panelResult.haiku?.loai_da,
+      declaration:          declaration ?? null,
     })
 
-    // 6. Lấy số dư xu hiện tại (chỉ để hiển thị cho đẹp giao diện)
+    // 7. Lấy xu mới
     const { data: profile } = await admin
-      .from('profiles')
-      .select('xu')
-      .eq('id', user.id)
-      .single()
+      .from('profiles').select('xu').eq('id', user.id).single()
 
-    return NextResponse.json({
-      ...panelResult,
-      xu_remaining: profile?.xu ?? 0,
-      message: "Chế độ sử dụng miễn phí đang được kích hoạt"
+    return NextResponse.json({ 
+      ...panelResult, 
+      xu_remaining: profile?.xu ?? 0 
     })
 
   } catch (err: unknown) {
