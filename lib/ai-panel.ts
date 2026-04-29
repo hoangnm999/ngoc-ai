@@ -75,7 +75,7 @@ async function callSonnet(imageBlocks: Anthropic.ImageBlockParam[], declContext?
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
   return {
     result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
-    usage: res.usage,
+    usage: res.usage || { input_tokens: 0, output_tokens: 0 },
   }
 }
 
@@ -100,7 +100,7 @@ async function callHaiku(imageBlocks: Anthropic.ImageBlockParam[], declContext?:
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
   return {
     result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
-    usage: res.usage,
+    usage: res.usage || { input_tokens: 0, output_tokens: 0 },
   }
 }
 
@@ -109,8 +109,8 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
     throw new Error('GEMINI_API_KEY not configured')
   }
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  // SỬA: dùng model ổn định với API version v1
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }, { apiVersion: 'v1' })
+  // FIX: bỏ apiVersion parameter
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
   
   const parts = [
     { text: buildGeminiPrompt(declContext) },
@@ -148,7 +148,6 @@ export async function runAIPanel(
   ]))
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  // Gọi 3 AI song song
   const [r1, r2, r3] = await Promise.allSettled([
     callSonnet(anthropicBlocks, declarationContext),
     callHaiku(anthropicBlocks, declarationContext),
@@ -156,9 +155,9 @@ export async function runAIPanel(
   ])
 
   const errors: Record<string, string> = {}
-  const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message, null)
-  const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message, null)
-  const gemini = r3.status === 'fulfilled' ? r3.value         : (errors.gemini = r3.reason?.message, null)
+  const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message || 'Unknown error', null)
+  const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message || 'Unknown error', null)
+  const gemini = r3.status === 'fulfilled' ? r3.value         : (errors.gemini = r3.reason?.message || 'Unknown error', null)
 
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
