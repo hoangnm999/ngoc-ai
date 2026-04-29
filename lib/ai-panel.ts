@@ -54,23 +54,24 @@ Return ONLY pure JSON (no markdown):
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
-async function callSonnet(imageBlocks: Anthropic.ImageBlockParam[], declContext?: string) {
+async function callSonnet(imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }>, declContext?: string) {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   
+  // Tạo content array: text prompt + images
+  const content: Anthropic.MessageParam['content'] = [
+    { type: 'text', text: `[USER'S GEMSTONE IMAGES]` },
+    ...imageBlocks,
+    { type: 'text', text: 'Phân tích và định giá viên ngọc/đá quý này. Đối chiếu với thông tin khai báo nếu có.' },
+  ]
+  
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1000,
     system: buildSonnetSystem(declContext),
-    messages: [{
-      role: 'user',
-      content: [
-        ...imageBlocks,
-        { type: 'text', text: 'Phân tích và định giá viên ngọc/đá quý này. Đối chiếu với thông tin khai báo nếu có.' },
-      ],
-    }],
+    messages: [{ role: 'user', content }],
   })
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
   return {
@@ -79,23 +80,23 @@ async function callSonnet(imageBlocks: Anthropic.ImageBlockParam[], declContext?
   }
 }
 
-async function callHaiku(imageBlocks: Anthropic.ImageBlockParam[], declContext?: string) {
+async function callHaiku(imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }>, declContext?: string) {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   
+  const content: Anthropic.MessageParam['content'] = [
+    { type: 'text', text: `[USER'S GEMSTONE IMAGES]` },
+    ...imageBlocks,
+    { type: 'text', text: 'Kiểm tra tính xác thực. Có mâu thuẫn nào với thông tin khai báo không?' },
+  ]
+  
   const res = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 700,
     system: buildHaikuSystem(declContext),
-    messages: [{
-      role: 'user',
-      content: [
-        ...imageBlocks,
-        { type: 'text', text: 'Kiểm tra tính xác thực. Có mâu thuẫn nào với thông tin khai báo không?' },
-      ],
-    }],
+    messages: [{ role: 'user', content }],
   })
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
   return {
@@ -109,7 +110,6 @@ async function callGemini(base64Images: Array<{ data: string; mimeType: string }
     throw new Error('GEMINI_API_KEY not configured')
   }
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  // FIX: bỏ apiVersion parameter
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
   
   const parts = [
@@ -142,15 +142,21 @@ export async function runAIPanel(
   images: Array<{ b64: string; mimeType: string; label: string }>,
   declarationContext?: string
 ): Promise<PanelResult> {
-  const anthropicBlocks: Anthropic.ImageBlockParam[] = images.flatMap(img => ([
-    { type: 'text' as const, text: `[${img.label}]` },
-    { type: 'image' as const, source: { type: 'base64' as const, media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', data: img.b64 } },
-  ]))
+  // Tạo image blocks cho Anthropic
+  const imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }> = images.map(img => ({
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: img.mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
+      data: img.b64,
+    },
+  }))
+  
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
   const [r1, r2, r3] = await Promise.allSettled([
-    callSonnet(anthropicBlocks, declarationContext),
-    callHaiku(anthropicBlocks, declarationContext),
+    callSonnet(imageBlocks, declarationContext),
+    callHaiku(imageBlocks, declarationContext),
     callGemini(geminiImages, declarationContext),
   ])
 
