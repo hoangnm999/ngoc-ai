@@ -268,7 +268,7 @@ export default function AppraisePage() {
                   background: img ? 'var(--bg-3)' : 'rgba(255,255,255,.01)', transition: 'border-color .2s, background .2s',
                 }}
               >
-                <input ref={(el) => {fileRefs.current[slot.id] = el;}} type="file" accept="image/*" style={{ display: 'none' }}
+                <input ref={el => { if (el) fileRefs.current[slot.id] = el; }} type="file" accept="image/*" style={{ display: 'none' }}
                   onChange={e => { if (e.target.files?.[0]) addImage(slot.id, e.target.files[0]); e.target.value = '' }} />
                 {img ? (
                   <>
