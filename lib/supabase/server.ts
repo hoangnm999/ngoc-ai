@@ -1,22 +1,27 @@
-// lib/supabase/server.ts — dùng ở Server Components & API Routes
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+// lib/supabase/server.ts
+import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
+// Dùng trong API routes và Server Components — đọc cookie từ request
 export function createClient() {
   const cookieStore = cookies()
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             )
           } catch {
-            // Có thể bị bỏ qua nếu gọi từ Server Component
+            // Server Component không set được cookie — bỏ qua
           }
         },
       },
@@ -24,24 +29,15 @@ export function createClient() {
   )
 }
 
-// Admin client — chỉ dùng server-side, bypass RLS
+// Dùng cho các thao tác cần bypass RLS (trừ xu, lưu appraisal, v.v.)
 export function createAdminClient() {
-  const cookieStore = cookies()
-  return createServerClient(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,  // KHÔNG có NEXT_PUBLIC_
     {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Có thể bị bỏ qua nếu gọi từ Server Component
-          }
-        },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
       },
     }
   )
