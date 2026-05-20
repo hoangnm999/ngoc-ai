@@ -27,7 +27,6 @@ export interface PanelResult {
   errors: Record<string, string>
 }
 
-// FIX: Timeout wrapper — Vercel Hobby giới hạn 60s, mỗi AI tối đa 20s
 function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<T> {
   return Promise.race([
     promise,
@@ -37,7 +36,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
   ])
 }
 
-// ── Prompts ──────────────────────────────────────────────────────────────────
+// ── Prompts ───────────────────────────────────────────────────────────────────
 
 function buildSonnetSystem(declContext?: string) {
   const decl = declContext ? `\n\n${declContext}\n` : ''
@@ -68,15 +67,13 @@ async function callSonnet(
   imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }>,
   declContext?: string
 ) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured')
-  }
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured')
 
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const content: Anthropic.MessageParam['content'] = [
     { type: 'text', text: `[USER'S GEMSTONE IMAGES]` },
     ...imageBlocks,
-    { type: 'text', text: 'Phân tích và định giá viên ngọc/đá quý này. Đối chiếu với thông tin khai báo nếu có.' },
+    { type: 'text', text: 'Phân tích và định giá viên ngọc/đá quý này.' },
   ]
 
   const res = await anthropic.messages.create({
@@ -87,18 +84,15 @@ async function callSonnet(
   })
 
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
+  console.log('[Sonnet raw]', text.slice(0, 200))
 
-  // FIX: Bọc JSON.parse trong try/catch — tránh crash toàn panel nếu AI trả về text lạ
-  let result: AIResult
   try {
-    result = JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
-  } catch {
-    throw new Error(`Sonnet JSON parse failed: ${text.slice(0, 100)}`)
-  }
-
-  return {
-    result,
-    usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+    return {
+      result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
+      usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+    }
+  } catch (e) {
+    throw new Error(`Sonnet JSON parse failed: ${text.slice(0, 200)}`)
   }
 }
 
@@ -106,15 +100,13 @@ async function callHaiku(
   imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }>,
   declContext?: string
 ) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured')
-  }
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured')
 
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const content: Anthropic.MessageParam['content'] = [
     { type: 'text', text: `[USER'S GEMSTONE IMAGES]` },
     ...imageBlocks,
-    { type: 'text', text: 'Kiểm tra tính xác thực. Có mâu thuẫn nào với thông tin khai báo không?' },
+    { type: 'text', text: 'Kiểm tra tính xác thực.' },
   ]
 
   const res = await anthropic.messages.create({
@@ -125,17 +117,15 @@ async function callHaiku(
   })
 
   const text = res.content.find(b => b.type === 'text')?.text ?? '{}'
+  console.log('[Haiku raw]', text.slice(0, 200))
 
-  let result: AIResult
   try {
-    result = JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
-  } catch {
-    throw new Error(`Haiku JSON parse failed: ${text.slice(0, 100)}`)
-  }
-
-  return {
-    result,
-    usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+    return {
+      result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
+      usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+    }
+  } catch (e) {
+    throw new Error(`Haiku JSON parse failed: ${text.slice(0, 200)}`)
   }
 }
 
@@ -143,9 +133,8 @@ async function callGemini(
   base64Images: Array<{ data: string; mimeType: string }>,
   declContext?: string
 ) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured')
-  }
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured')
+
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
@@ -157,11 +146,12 @@ async function callGemini(
 
   const result = await model.generateContent(parts)
   const text = result.response.text()
+  console.log('[Gemini raw]', text.slice(0, 200))
 
   try {
     return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
-  } catch {
-    throw new Error(`Gemini JSON parse failed: ${text.slice(0, 100)}`)
+  } catch (e) {
+    throw new Error(`Gemini JSON parse failed: ${text.slice(0, 200)}`)
   }
 }
 
@@ -185,6 +175,13 @@ export async function runAIPanel(
   images: Array<{ b64: string; mimeType: string; label: string }>,
   declarationContext?: string
 ): Promise<PanelResult> {
+
+  // LOG: Kiểm tra env vars có tồn tại không
+  console.log('[ai-panel] ANTHROPIC_API_KEY set:', !!process.env.ANTHROPIC_API_KEY)
+  console.log('[ai-panel] GEMINI_API_KEY set:', !!process.env.GEMINI_API_KEY)
+  console.log('[ai-panel] images count:', images.length)
+  console.log('[ai-panel] image sizes (bytes):', images.map(i => Math.round(i.b64.length * 0.75)))
+
   const imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }> = images.map(img => ({
     type: 'image',
     source: {
@@ -196,17 +193,21 @@ export async function runAIPanel(
 
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  // FIX: Mỗi AI có timeout 20s riêng — tổng Promise.allSettled tối đa ~20s
   const [r1, r2, r3] = await Promise.allSettled([
     withTimeout(callSonnet(imageBlocks, declarationContext), 20000, 'Sonnet'),
     withTimeout(callHaiku(imageBlocks, declarationContext), 20000, 'Haiku'),
     withTimeout(callGemini(geminiImages, declarationContext), 20000, 'Gemini'),
   ])
 
+  // LOG: Kết quả từng AI
+  console.log('[ai-panel] Sonnet:', r1.status, r1.status === 'rejected' ? r1.reason?.message : 'OK')
+  console.log('[ai-panel] Haiku:', r2.status, r2.status === 'rejected' ? r2.reason?.message : 'OK')
+  console.log('[ai-panel] Gemini:', r3.status, r3.status === 'rejected' ? r3.reason?.message : 'OK')
+
   const errors: Record<string, string> = {}
-  const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message || 'Unknown error', null)
-  const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message || 'Unknown error', null)
-  const gemini = r3.status === 'fulfilled' ? r3.value        : (errors.gemini = r3.reason?.message || 'Unknown error', null)
+  const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message || 'Unknown', null)
+  const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message || 'Unknown', null)
+  const gemini = r3.status === 'fulfilled' ? r3.value        : (errors.gemini = r3.reason?.message || 'Unknown', null)
 
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
@@ -216,11 +217,7 @@ export async function runAIPanel(
   return {
     sonnet, haiku, gemini,
     consensus: buildConsensus([sonnet, haiku, gemini]),
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      cost_usd: inputTokens * 0.000003 + outputTokens * 0.000015,
-    },
+    usage: { input_tokens: inputTokens, output_tokens: outputTokens, cost_usd: inputTokens * 0.000003 + outputTokens * 0.000015 },
     errors,
   }
 }
