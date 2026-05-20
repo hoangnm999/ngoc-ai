@@ -3,7 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-// Dùng trong API routes và Server Components — đọc cookie từ request
 export function createClient() {
   const cookieStore = cookies()
 
@@ -15,10 +14,12 @@ export function createClient() {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
+        // FIX: Explicit type thay vì để TypeScript infer → tránh implicit any
+        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              cookieStore.set(name, value, options as any)
             )
           } catch {
             // Server Component không set được cookie — bỏ qua
@@ -29,11 +30,10 @@ export function createClient() {
   )
 }
 
-// Dùng cho các thao tác cần bypass RLS (trừ xu, lưu appraisal, v.v.)
 export function createAdminClient() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,  // KHÔNG có NEXT_PUBLIC_
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       auth: {
         autoRefreshToken: false,
