@@ -9,7 +9,7 @@ const XU_PER_APPRAISAL = 2
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Parse body trước — không đụng Supabase
+    // 1. Parse body trước
     const body = await req.json()
     const { images, hasVideo, declarationContext, declaration } = body as {
       images: Array<{ b64: string; mimeType: string; label: string }>
@@ -22,29 +22,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cần ít nhất 3 ảnh' }, { status: 400 })
     }
 
-    // 2. Auth dùng createClient (đọc cookie từ request)
+    // 2. Xác thực user
     const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-
     if (authError || !user) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 })
     }
 
-    // 3. Dùng adminClient để bypass RLS khi đọc/ghi data
     const admin = createAdminClient()
 
-    // 4. Kiểm tra xu trước khi gọi AI
+    // 3. Lấy profile — tự tạo nếu chưa có (upsert)
+    await admin
+      .from('profiles')
+      .upsert(
+        { id: user.id, email: user.email ?? '', xu: 2 },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+
     const { data: profile, error: profileError } = await admin
       .from('profiles')
       .select('xu')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()  // FIX: dùng maybeSingle() thay vì single() — trả null thay vì error khi không có row
 
     if (profileError) {
       console.error('[appraise] profile error:', profileError)
       return NextResponse.json(
-        { error: `Không tìm thấy tài khoản: ${profileError.message}` },
-        { status: 404 }
+        { error: `Lỗi đọc tài khoản: ${profileError.message}` },
+        { status: 500 }
       )
     }
 
@@ -55,10 +60,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 5. Gọi AI
+    // 4. Gọi AI
     const panelResult = await runAIPanel(images, declarationContext)
 
-    // 6. Chỉ fail nếu CẢ 3 AI đều lỗi
+    // 5. Chỉ fail nếu CẢ 3 AI đều lỗi
     const successCount = [panelResult.sonnet, panelResult.haiku, panelResult.gemini]
       .filter(Boolean).length
 
@@ -70,18 +75,18 @@ export async function POST(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // 7. Trừ xu sau khi AI thành công
+    // 6. Trừ xu
     const { data: deducted, error: deductError } = await admin
       .rpc('deduct_xu', { p_user_id: user.id, p_amount: XU_PER_APPRAISAL })
 
     if (deductError || !deducted) {
       return NextResponse.json(
-        { error: 'Lỗi trừ xu. Vui lòng thử lại.' },
-        { status: 500 }
+        { error: 'Không đủ xu. Vui lòng nạp thêm.' },
+        { status: 402 }
       )
     }
 
-    // 8. Lưu kết quả
+    // 7. Lưu kết quả
     const { error: insertError } = await admin.from('appraisals').insert({
       user_id:              user.id,
       xu_used:              XU_PER_APPRAISAL,
@@ -99,16 +104,15 @@ export async function POST(req: NextRequest) {
     })
 
     if (insertError) {
-      // Log lỗi nhưng không fail — xu đã trừ, kết quả vẫn trả về
       console.error('[appraise] insert error:', insertError)
     }
 
-    // 9. Lấy xu còn lại
+    // 8. Lấy xu còn lại
     const { data: updatedProfile } = await admin
       .from('profiles')
       .select('xu')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     return NextResponse.json({
       ...panelResult,
