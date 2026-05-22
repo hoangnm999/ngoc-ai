@@ -16,14 +16,35 @@ interface AIResult {
   do_tin_cay: number
   ghi_chu?: string
 }
+
+// Hallucination Guard types — sync với ai-panel.ts
+type HallucinationLevel = 'SAFE' | 'WARNING' | 'BLOCKED'
+interface HallucinationGuard {
+  level: HallucinationLevel
+  reasons: string[]
+  blocked: boolean
+  suggestion: string
+}
+
 interface PanelResult {
   sonnet: AIResult | null
   haiku: AIResult | null
   gemini: AIResult | null
   consensus: { thap: number; cao: number; xep_hang: string; do_tin_cay: number; agreement: number } | null
+  guard: HallucinationGuard
   usage: { input_tokens: number; output_tokens: number; cost_usd: number }
   errors: Record<string, string>
   xu_remaining: number
+  partial_errors?: Record<string, string>
+}
+
+// Response khi guard BLOCKED (HTTP 422)
+interface BlockedResult {
+  blocked: true
+  guard: HallucinationGuard
+  sonnet: AIResult | null
+  haiku: AIResult | null
+  gemini: AIResult | null
 }
 
 /* ── Config ── */
@@ -45,6 +66,13 @@ const GRADE_CFG: Record<string, { c: string; emoji: string }> = {
   'Tốt':      { c: '#60a5fa', emoji: '◉' },
   'Xuất sắc': { c: '#d4a853', emoji: '✦' },
   'Đỉnh cao': { c: '#e879f9', emoji: '♦' },
+}
+
+// Màu sắc theo guard level
+const GUARD_CFG: Record<HallucinationLevel, { color: string; bg: string; icon: string; label: string }> = {
+  SAFE:    { color: '#5eead4', bg: 'rgba(94,234,212,.08)',  icon: '✓', label: 'Kết quả đáng tin cậy' },
+  WARNING: { color: '#d4a853', bg: 'rgba(212,168,83,.08)',  icon: '⚠', label: 'Kết quả cần xem xét thêm' },
+  BLOCKED: { color: '#f87171', bg: 'rgba(248,113,113,.08)', icon: '✕', label: 'Kết quả không đủ tin cậy' },
 }
 
 /* ── Helpers ── */
@@ -97,6 +125,94 @@ function extractFrames(file: File, n = 3): Promise<Array<{ preview: string; b64:
   })
 }
 
+/* ── Guard Banner Component ── */
+function GuardBanner({ guard }: { guard: HallucinationGuard }) {
+  const cfg = GUARD_CFG[guard.level]
+  return (
+    <div style={{
+      padding: '16px 20px', borderRadius: 'var(--radius)',
+      background: cfg.bg, border: `1px solid ${cfg.color}33`,
+      marginBottom: 20,
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: guard.reasons.length > 0 ? 12 : 0 }}>
+        <span style={{ fontSize: 20, color: cfg.color }}>{cfg.icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: cfg.color }}>{cfg.label}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            Hallucination Guard · Level: {guard.level}
+          </div>
+        </div>
+      </div>
+
+      {/* Reasons */}
+      {guard.reasons.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {guard.reasons.map((r, i) => (
+            <div key={i} style={{
+              display: 'flex', gap: 8, alignItems: 'flex-start',
+              padding: '4px 0', borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+            }}>
+              <span style={{ color: cfg.color, fontSize: 10, marginTop: 2, flexShrink: 0 }}>›</span>
+              <span style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{r}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Suggestion */}
+      <div style={{
+        padding: '8px 12px', borderRadius: 6,
+        background: 'rgba(0,0,0,.2)', fontSize: 12,
+        color: 'var(--text-3)', lineHeight: 1.6,
+        borderLeft: `2px solid ${cfg.color}`,
+      }}>
+        💡 {guard.suggestion}
+      </div>
+    </div>
+  )
+}
+
+/* ── Blocked Result Component — hiển thị khi 422 ── */
+function BlockedPanel({ data, onRetry }: { data: BlockedResult; onRetry: () => void }) {
+  return (
+    <div className="fade-up">
+      <GuardBanner guard={data.guard} />
+
+      {/* Hướng dẫn chụp ảnh tốt hơn */}
+      <Card style={{ padding: 24, marginBottom: 20 }}>
+        <Label>Hướng dẫn chụp ảnh để AI phân tích chính xác</Label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+          {[
+            { icon: '☀️', title: 'Ánh sáng tự nhiên', desc: 'Chụp gần cửa sổ, tránh đèn vàng' },
+            { icon: '⬜', title: 'Nền trắng/đen thuần', desc: 'Không dùng nền hoa văn' },
+            { icon: '📐', title: 'Nhiều góc độ', desc: 'Tổng thể + cận cảnh + ánh sáng xuyên qua' },
+            { icon: '🔍', title: 'Ảnh sắc nét', desc: 'Tối thiểu 800px, không mờ, không rung' },
+          ].map(tip => (
+            <div key={tip.title} style={{
+              padding: '12px 14px', borderRadius: 8,
+              background: 'var(--bg-2)', border: '1px solid var(--border)',
+            }}>
+              <div style={{ fontSize: 18, marginBottom: 4 }}>{tip.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{tip.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{tip.desc}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div style={{ textAlign: 'center' }}>
+        <Btn variant="jade" onClick={onRetry} style={{ padding: '12px 40px' }}>
+          ↺ Thử lại với ảnh mới
+        </Btn>
+        <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 10, fontFamily: 'var(--font-mono)' }}>
+          Xu không bị trừ khi kết quả bị chặn
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /* ── AI Card ── */
 function AICard({ model, result, loading, error }: { model: typeof AI_MODELS[0]; result: AIResult | null; loading: boolean; error?: string }) {
   const cfg = GRADE_CFG[result?.xep_hang ?? ''] ?? GRADE_CFG['Tốt']
@@ -122,7 +238,9 @@ function AICard({ model, result, loading, error }: { model: typeof AI_MODELS[0];
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>TIN CẬY</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: result.do_tin_cay >= 75 ? '#5eead4' : '#d4a853', fontFamily: 'var(--font-mono)' }}>{result.do_tin_cay}%</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: result.do_tin_cay >= 75 ? '#5eead4' : result.do_tin_cay >= 60 ? '#d4a853' : '#f87171', fontFamily: 'var(--font-mono)' }}>
+                {result.do_tin_cay}%
+              </div>
             </div>
           </div>
           <div style={{ background: 'var(--bg-3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
@@ -157,6 +275,7 @@ export default function AppraisePage() {
   const [frames, setFrames] = useState<Array<{ preview: string; b64: string }>>([])
   const [vidLoading, setVidLoading] = useState(false)
   const [result, setResult] = useState<PanelResult | null>(null)
+  const [blocked, setBlocked] = useState<BlockedResult | null>(null)  // ← state mới cho 422
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -188,11 +307,17 @@ export default function AppraisePage() {
     setFrames(f); setVidLoading(false)
   }
 
+  // Reset về trạng thái upload để thử lại
+  const handleRetry = () => {
+    setBlocked(null)
+    setResult(null)
+    setError('')
+  }
+
   const analyze = async () => {
     if (!canAnalyze) return
-    setLoading(true); setError(''); setResult(null)
+    setLoading(true); setError(''); setResult(null); setBlocked(null)
 
-    // Build images array for API
     const imgPayload = [
       ...SHOT_SLOTS.filter(s => images[s.id]).map(s => ({
         b64: images[s.id].b64, mimeType: images[s.id].type, label: s.label,
@@ -200,17 +325,35 @@ export default function AppraisePage() {
       ...frames.map((f, i) => ({ b64: f.b64, mimeType: 'image/jpeg', label: `Video frame ${i + 1}` })),
     ]
 
-    const resp = await fetch('/api/appraise', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images: imgPayload, hasVideo: frames.length > 0 }),
-    })
+    try {
+      const resp = await fetch('/api/appraise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: imgPayload, hasVideo: frames.length > 0 }),
+      })
 
-    const data = await resp.json()
-    if (!resp.ok) { setError(data.error || 'Lỗi phân tích'); setLoading(false); return }
+      const data = await resp.json()
 
-    setResult(data)
-    if (data.xu_remaining !== undefined) setXu(data.xu_remaining)
+      // 422 = Guard BLOCKED — xu không bị trừ
+      if (resp.status === 422 && data.blocked) {
+        setBlocked(data as BlockedResult)
+        setLoading(false)
+        return
+      }
+
+      if (!resp.ok) {
+        setError(data.error || 'Lỗi phân tích')
+        setLoading(false)
+        return
+      }
+
+      setResult(data as PanelResult)
+      if (data.xu_remaining !== undefined) setXu(data.xu_remaining)
+
+    } catch (e) {
+      setError('Lỗi kết nối. Vui lòng thử lại.')
+    }
+
     setLoading(false)
   }
 
@@ -333,9 +476,26 @@ export default function AppraisePage() {
 
       {error && <div style={{ marginBottom: 20 }}><Alert type="error">{error}</Alert></div>}
 
-      {/* Results */}
+      {/* BLOCKED — Guard chặn, không trừ xu */}
+      {blocked && <BlockedPanel data={blocked} onRetry={handleRetry} />}
+
+      {/* Results — chỉ hiển thị khi SAFE hoặc WARNING */}
       {result && (
         <div className="fade-up">
+
+          {/* Guard Banner — luôn hiển thị trên đầu kết quả */}
+          <GuardBanner guard={result.guard} />
+
+          {/* Partial errors — một số AI bị lỗi nhưng vẫn có kết quả */}
+          {result.partial_errors && Object.keys(result.partial_errors).length > 0 && (
+            <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(212,168,83,.06)', border: '1px solid rgba(212,168,83,.2)' }}>
+              <div style={{ fontSize: 11, color: '#d4a853', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>⚠ Một số AI không phản hồi:</div>
+              {Object.entries(result.partial_errors).map(([ai, err]) => (
+                <div key={ai} style={{ fontSize: 11, color: 'var(--text-3)' }}>{ai}: {err}</div>
+              ))}
+            </div>
+          )}
+
           {/* 3-AI Panel */}
           <Label>Phân tích từ 3 AI độc lập</Label>
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -356,7 +516,7 @@ export default function AppraisePage() {
                 <div>
                   <div style={{ fontSize: 40, fontWeight: 300, color: 'var(--text)' }}>{consCfg.emoji} {cons.xep_hang}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
-                    Tin cậy: <span style={{ color: cons.do_tin_cay >= 75 ? 'var(--jade)' : '#d4a853' }}>{cons.do_tin_cay}%</span>
+                    Tin cậy: <span style={{ color: cons.do_tin_cay >= 75 ? 'var(--jade)' : cons.do_tin_cay >= 60 ? '#d4a853' : '#f87171' }}>{cons.do_tin_cay}%</span>
                     {' · '}Đồng thuận: <span style={{ color: 'var(--jade)' }}>{cons.agreement}/3 AI</span>
                   </div>
                 </div>
