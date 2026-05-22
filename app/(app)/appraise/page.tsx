@@ -90,6 +90,28 @@ function fileToB64(file: File): Promise<string> {
     r.readAsDataURL(file)
   })
 }
+
+// Compress + resize ảnh về max 1024px, quality 0.82 trước khi gửi AI
+// Giảm từ ~300KB xuống ~60-80KB → nhanh hơn 3-4x, tránh timeout
+function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<{ b64: string; mimeType: string }> {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const { width: w, height: h } = img
+      const scale = Math.min(1, maxPx / Math.max(w, h))
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(w * scale)
+      canvas.height = Math.round(h * scale)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      res({ b64: dataUrl.split(',')[1], mimeType: 'image/jpeg' })
+    }
+    img.onerror = rej
+    img.src = url
+  })
+}
 function checkRes(file: File): Promise<{ ok: boolean; w: number; h: number }> {
   return new Promise(resolve => {
     const url = URL.createObjectURL(file)
@@ -115,7 +137,7 @@ function extractFrames(file: File, n = 3): Promise<Array<{ preview: string; b64:
       v.onseeked = () => {
         const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight
         c.getContext('2d')!.drawImage(v, 0, 0)
-        const dataUrl = c.toDataURL('image/jpeg', .82)
+        const dataUrl = c.toDataURL('image/jpeg', .72)  // frame dùng quality thấp hơn — tiết kiệm token
         frames.push({ preview: dataUrl, b64: dataUrl.split(',')[1] })
         idx++; grab()
       }
@@ -297,8 +319,8 @@ export default function AppraisePage() {
 
   const addImage = useCallback(async (id: string, file: File) => {
     const preview = URL.createObjectURL(file)
-    const [q, b64] = await Promise.all([checkRes(file), fileToB64(file)])
-    setImages(p => ({ ...p, [id]: { preview, b64, type: file.type, ok: q.ok, w: q.w, h: q.h } }))
+    const [q, compressed] = await Promise.all([checkRes(file), compressImage(file)])
+    setImages(p => ({ ...p, [id]: { preview, b64: compressed.b64, type: compressed.mimeType, ok: q.ok, w: q.w, h: q.h } }))
   }, [])
 
   const handleVideo = async (file: File) => {
