@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    // 3. Lấy profile — tự tạo nếu chưa có (upsert)
+    // 3. Upsert profile + kiểm tra xu
     await admin
       .from('profiles')
       .upsert(
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .select('xu')
       .eq('id', user.id)
-      .maybeSingle()  // FIX: dùng maybeSingle() thay vì single() — trả null thay vì error khi không có row
+      .maybeSingle()
 
     if (profileError) {
       console.error('[appraise] profile error:', profileError)
@@ -60,10 +60,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 4. Gọi AI
+    // 4. Gọi AI + Hallucination Guard
     const panelResult = await runAIPanel(images, declarationContext)
 
-    // 5. Chỉ fail nếu CẢ 3 AI đều lỗi
+    // 5. Nếu 100% AI fail → không trừ xu
     const successCount = [panelResult.sonnet, panelResult.haiku, panelResult.gemini]
       .filter(Boolean).length
 
@@ -75,7 +75,20 @@ export async function POST(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // 6. Trừ xu
+    // 6. GUARD BLOCKED → không trừ xu, trả về lý do để user sửa ảnh
+    if (panelResult.guard.blocked) {
+      return NextResponse.json({
+        guard: panelResult.guard,
+        blocked: true,
+        // Vẫn trả về raw results để debug nhưng không lưu DB, không trừ xu
+        sonnet: panelResult.sonnet,
+        haiku: panelResult.haiku,
+        gemini: panelResult.gemini,
+      }, { status: 422 })
+      // 422 Unprocessable Entity — request hợp lệ nhưng AI không đủ tin cậy
+    }
+
+    // 7. Trừ xu (chỉ khi guard SAFE hoặc WARNING)
     const { data: deducted, error: deductError } = await admin
       .rpc('deduct_xu', { p_user_id: user.id, p_amount: XU_PER_APPRAISAL })
 
@@ -86,7 +99,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 7. Lưu kết quả
+    // 8. Lưu kết quả vào DB
     const { error: insertError } = await admin.from('appraisals').insert({
       user_id:              user.id,
       xu_used:              XU_PER_APPRAISAL,
@@ -107,7 +120,7 @@ export async function POST(req: NextRequest) {
       console.error('[appraise] insert error:', insertError)
     }
 
-    // 8. Lấy xu còn lại
+    // 9. Lấy xu còn lại
     const { data: updatedProfile } = await admin
       .from('profiles')
       .select('xu')
