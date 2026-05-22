@@ -58,6 +58,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
   ])
 }
 
+
+// ── JSON extractor — handles markdown fences + truncated responses ─────────────
+
+function extractJSON(raw: string): string {
+  // Thử lấy nội dung trong ```json ... ``` hoặc ``` ... ```
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenced) return fenced[1].trim()
+  // Fallback: tìm { ... } đầu tiên
+  const curly = raw.indexOf('{')
+  const lastCurly = raw.lastIndexOf('}')
+  if (curly !== -1 && lastCurly !== -1) return raw.slice(curly, lastCurly + 1).trim()
+  return raw.trim()
+}
+
 // ── Prompts (thêm yêu cầu AI tự báo cáo uncertainty) ─────────────────────────
 
 function buildSonnetSystem(declContext?: string) {
@@ -118,7 +132,7 @@ async function callSonnet(
   ]
 
   const res = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1000,
     system: buildSonnetSystem(declContext),
     messages: [{ role: 'user', content }],
@@ -129,7 +143,7 @@ async function callSonnet(
 
   try {
     return {
-      result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
+      result: JSON.parse(extractJSON(text)) as AIResult,
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
@@ -162,7 +176,7 @@ async function callHaiku(
 
   try {
     return {
-      result: JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult,
+      result: JSON.parse(extractJSON(text)) as AIResult,
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
@@ -189,7 +203,7 @@ async function callGemini(
   console.log('[Gemini raw]', text.slice(0, 200))
 
   try {
-    return JSON.parse(text.replace(/```json|```/g, '').trim()) as AIResult
+    return JSON.parse(extractJSON(text)) as AIResult
   } catch {
     throw new Error(`Gemini JSON parse failed: ${text.slice(0, 200)}`)
   }
