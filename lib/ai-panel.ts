@@ -1,6 +1,5 @@
 // lib/ai-panel.ts — Server-side only
 import Anthropic from '@anthropic-ai/sdk'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export interface AIResult {
   loai_da: string
@@ -40,7 +39,7 @@ export interface HallucinationGuard {
 export interface PanelResult {
   sonnet: AIResult | null
   haiku: AIResult | null
-  gemini: AIResult | null
+  gemini: null  // Tạm vô hiệu — dùng Sonnet + Haiku
   consensus: ConsensusResult | null
   guard: HallucinationGuard          // ← LỚP BẢO VỆ MỚI
   usage: { input_tokens: number; output_tokens: number; cost_usd: number }
@@ -100,19 +99,6 @@ Trả về JSON THUẦN TÚY:
 {"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tốt","nhan_xet":"","dau_hieu_that_gia":"","canh_bao":"","mau_thuan_khai_bao":"","do_tin_cay":70}`
 }
 
-function buildGeminiPrompt(declContext?: string) {
-  const decl = declContext ? `\n\nSELLER DECLARATION:\n${declContext}\n\nCross-check declaration vs images, note discrepancies.\n` : ''
-  return `You are an expert gemologist with strict uncertainty reporting.${decl}
-
-IMPORTANT RULES:
-- If image is blurry or unclear → do_tin_cay MUST be < 50
-- If you cannot identify the stone type confidently → loai_da = "Unknown"
-- If price range is very wide (cao > 3x thap) → do_tin_cay MUST be < 60
-- NEVER fabricate details you cannot see
-
-Return ONLY pure JSON (no markdown):
-{"loai_da":"","gia_tri_uoc_tinh":{"thap":0,"cao":0},"xep_hang":"Tot","nhan_xet":"","do_tin_cay":70,"mau_thuan_khai_bao":"","ghi_chu":""}`
-}
 
 // ── Individual callers ────────────────────────────────────────────────────────
 
@@ -182,30 +168,6 @@ async function callHaiku(
   }
 }
 
-async function callGemini(
-  base64Images: Array<{ data: string; mimeType: string }>,
-  declContext?: string
-) {
-  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured')
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
-  const parts = [
-    { text: buildGeminiPrompt(declContext) },
-    ...base64Images.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } })),
-    { text: 'Analyze and return JSON only. Be honest about uncertainty.' },
-  ]
-
-  const result = await model.generateContent(parts)
-  const text = result.response.text()
-  console.log('[Gemini raw]', text.slice(0, 200))
-
-  try {
-    return JSON.parse(extractJSON(text)) as AIResult
-  } catch {
-    throw new Error(`Gemini JSON parse failed: ${text.slice(0, 200)}`)
-  }
-}
 
 // ── Hallucination Guard — 3 lớp bảo vệ ──────────────────────────────────────
 
@@ -359,34 +321,32 @@ export async function runAIPanel(
     },
   }))
 
-  const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
-  const [r1, r2, r3] = await Promise.allSettled([
+  const [r1, r2] = await Promise.allSettled([
     withTimeout(callSonnet(imageBlocks, declarationContext), 45000, 'Sonnet'),
     withTimeout(callHaiku(imageBlocks, declarationContext), 28000, 'Haiku'),
-    withTimeout(callGemini(geminiImages, declarationContext), 28000, 'Gemini'),
   ])
 
   console.log('[ai-panel] Sonnet:', r1.status, r1.status === 'rejected' ? r1.reason?.message : 'OK')
   console.log('[ai-panel] Haiku:', r2.status, r2.status === 'rejected' ? r2.reason?.message : 'OK')
-  console.log('[ai-panel] Gemini:', r3.status, r3.status === 'rejected' ? r3.reason?.message : 'OK')
 
   const errors: Record<string, string> = {}
   const sonnet = r1.status === 'fulfilled' ? r1.value.result : (errors.sonnet = r1.reason?.message || 'Unknown', null)
   const haiku  = r2.status === 'fulfilled' ? r2.value.result : (errors.haiku  = r2.reason?.message || 'Unknown', null)
-  const gemini = r3.status === 'fulfilled' ? r3.value        : (errors.gemini = r3.reason?.message || 'Unknown', null)
+  const gemini = null  // Tạm vô hiệu — Gemini billing issue
 
-  const successCount = [sonnet, haiku, gemini].filter(Boolean).length
-  const consensus = buildConsensus([sonnet, haiku, gemini])
+  const successCount = [sonnet, haiku].filter(Boolean).length
+  const consensus = buildConsensus([sonnet, haiku])
 
   // Chạy hallucination guard
-  const guard = runHallucinationGuard([sonnet, haiku, gemini], consensus, successCount)
+  const guard = runHallucinationGuard([sonnet, haiku], consensus, successCount)
   console.log('[ai-panel] Guard level:', guard.level, '| Reasons:', guard.reasons)
 
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0)
+  // Gemini: tạm vô hiệu
 
   return {
     sonnet, haiku, gemini,
