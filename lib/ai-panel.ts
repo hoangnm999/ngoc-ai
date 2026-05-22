@@ -236,7 +236,7 @@ function runHallucinationGuard(
 
     if (uniqueTypes.size >= 3) {
       // Cả 3 AI nói khác nhau hoàn toàn → BLOCKED
-      reasons.push(`3 AI không đồng thuận loại đá: ${[...uniqueTypes].join(' / ')}`)
+      reasons.push(`3 AI không đồng thuận loại đá: ${Array.from(uniqueTypes).join(' / ')}`)
       level = 'BLOCKED'
     } else if (uniqueTypes.size === 2 && valid.length === 3) {
       // 2 AI đồng thuận, 1 AI khác → WARNING
