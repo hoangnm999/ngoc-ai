@@ -62,10 +62,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
 // ── JSON extractor — handles markdown fences + truncated responses ─────────────
 
 function extractJSON(raw: string): string {
-  // Thử lấy nội dung trong ```json ... ``` hoặc ``` ... ```
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (fenced) return fenced[1].trim()
-  // Fallback: tìm { ... } đầu tiên
   const curly = raw.indexOf('{')
   const lastCurly = raw.lastIndexOf('}')
   if (curly !== -1 && lastCurly !== -1) return raw.slice(curly, lastCurly + 1).trim()
@@ -222,9 +220,12 @@ function runHallucinationGuard(
   const valid = results.filter(Boolean) as AIResult[]
 
   // ── LỚP 1: Kiểm tra số lượng AI thành công ──────────────────────────────
-  if (successCount === 1) {
+  if (successCount === 0) {
+    // 0 AI → route.ts đã handle riêng (trả 500), guard không cần xử lý
+  } else if (successCount === 1) {
     reasons.push('Chỉ 1/3 AI phản hồi — không đủ để cross-check')
-    level = 'WARNING'
+    if (level === 'SAFE') level = 'WARNING'
+    // KHÔNG BLOCKED — vẫn cho trả kết quả với cảnh báo
   }
 
   // ── LỚP 2: Kiểm tra đồng thuận loại đá (quan trọng nhất) ───────────────
@@ -361,9 +362,9 @@ export async function runAIPanel(
   const geminiImages = images.map(img => ({ data: img.b64, mimeType: img.mimeType }))
 
   const [r1, r2, r3] = await Promise.allSettled([
-    withTimeout(callSonnet(imageBlocks, declarationContext), 20000, 'Sonnet'),
-    withTimeout(callHaiku(imageBlocks, declarationContext), 20000, 'Haiku'),
-    withTimeout(callGemini(geminiImages, declarationContext), 20000, 'Gemini'),
+    withTimeout(callSonnet(imageBlocks, declarationContext), 45000, 'Sonnet'),
+    withTimeout(callHaiku(imageBlocks, declarationContext), 28000, 'Haiku'),
+    withTimeout(callGemini(geminiImages, declarationContext), 28000, 'Gemini'),
   ])
 
   console.log('[ai-panel] Sonnet:', r1.status, r1.status === 'rejected' ? r1.reason?.message : 'OK')
