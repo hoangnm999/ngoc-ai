@@ -108,11 +108,9 @@ export async function POST(req: NextRequest) {
       result_sonnet:        panelResult.sonnet,
       result_haiku:         panelResult.haiku,
       result_gemini:        panelResult.gemini,
-      consensus_grade:      panelResult.consensus?.xep_hang,
-      consensus_price_low:  panelResult.consensus?.thap,
-      consensus_price_high: panelResult.consensus?.cao,
+      consensus_grade:      panelResult.consensus?.loai_da,
       consensus_confidence: panelResult.consensus?.do_tin_cay,
-      stone_type:           panelResult.sonnet?.loai_da || panelResult.haiku?.loai_da,
+      stone_type:           panelResult.consensus?.loai_da || panelResult.sonnet?.loai_da || panelResult.haiku?.loai_da,
       declaration:          declaration ?? null,
     })
 
