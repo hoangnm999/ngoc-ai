@@ -496,7 +496,7 @@ export default function AppraisePage() {
           )}
 
           {/* 2 AI Cards */}
-          <Label style={{ marginBottom: 12 }}>Chi tiết từ 2 AI</Label>
+          <div style={{ marginBottom: 12 }}><Label>Chi tiết từ 2 AI</Label></div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
             <AICard name="Claude Sonnet" color="#5eead4" vendor="Anthropic" role="Phân tích chuyên sâu"
               result={result.sonnet} error={result.errors?.sonnet} />
