@@ -353,7 +353,7 @@ export default function AppraisePage() {
       </div>
 
       {xu !== null && xu < 2 && (
-        <Alert type="warn" style={{ marginBottom: 20 }}>Không đủ xu. Vui lòng nạp thêm trong <strong>Ví xu</strong>.</Alert>
+        <div style={{ marginBottom: 20 }}><Alert type="warn">Không đủ xu. Vui lòng nạp thêm trong <strong>Ví xu</strong>.</Alert></div>
       )}
 
       {/* Image Grid */}
