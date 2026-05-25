@@ -86,7 +86,8 @@ NHIỆM VỤ: Nhận diện loại đá và cung cấp thông tin hữu ích cho
 
 QUY TẮC BẮT BUỘC:
 - Chỉ mô tả những gì THỰC SỰ nhìn thấy trong ảnh
-- Nếu ảnh mờ/tối → do_tin_cay < 45, ghi rõ lý do
+- Nếu ảnh MỜ HOÀN TOÀN/TỐI ĐEN không nhìn thấy gì → do_tin_cay < 35
+- Nếu ảnh nhỏ nhưng vẫn nhìn thấy màu sắc và hình dạng → do_tin_cay 50-65
 - Nếu không chắc loại đá → loai_da = "Chưa xác định được — cần kiểm định"
 - KHÔNG bịa đặc điểm không nhìn thấy được
 - Ưu tiên cảnh báo hơn là reassure sai
@@ -117,7 +118,8 @@ function buildHaikuSystem(declContext?: string): string {
 NHIỆM VỤ: Xác thực tính tự nhiên của đá từ ảnh. KHÔNG định giá.
 
 QUY TẮC:
-- Nếu ảnh không đủ rõ → do_tin_cay < 45
+- Nếu ảnh MỜ HOÀN TOÀN/TỐI ĐEN → do_tin_cay < 35
+- Nếu ảnh nhỏ nhưng nhìn thấy được → do_tin_cay 50-65
 - Thà cảnh báo sai còn hơn reassure sai
 - Chỉ kết luận những gì nhìn thấy được
 
@@ -263,10 +265,10 @@ function runHallucinationGuard(
     ? Math.round(valid.reduce((s, r) => s + (r.do_tin_cay ?? 60), 0) / valid.length)
     : 0
 
-  if (avgConf < 40) {
+  if (avgConf < 35) {
     reasons.push(`Độ tin cậy quá thấp (${avgConf}%) — ảnh không đủ chất lượng để nhận diện`)
     level = 'BLOCKED'
-  } else if (avgConf < 55) {
+  } else if (avgConf < 50) {
     reasons.push(`Độ tin cậy thấp (${avgConf}%) — nên chụp thêm ảnh rõ hơn`)
     if (level === 'SAFE') level = 'WARNING'
   }
