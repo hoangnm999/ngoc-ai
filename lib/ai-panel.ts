@@ -68,12 +68,47 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
 }
 
 function extractJSON(raw: string): string {
+  // Case 1: JSON trong markdown fence hoàn chỉnh
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (fenced) return fenced[1].trim()
-  const curly = raw.indexOf('{')
-  const lastCurly = raw.lastIndexOf('}')
-  if (curly !== -1 && lastCurly !== -1) return raw.slice(curly, lastCurly + 1).trim()
-  return raw.trim()
+  if (fenced) {
+    const inner = fenced[1].trim()
+    // Nếu là array, lấy phần tử đầu tiên
+    if (inner.startsWith('[')) {
+      const arrMatch = inner.match(/^\s*\[\s*(\{[\s\S]*\})/)
+      if (arrMatch) return repairJSON(arrMatch[1])
+    }
+    return inner
+  }
+  // Case 2: JSON không có fence
+  const start = raw.indexOf('{')
+  if (start === -1) return raw.trim()
+  // Case 3: JSON bị truncate — tìm closing brace cuối cùng hợp lệ
+  const end = raw.lastIndexOf('}')
+  if (end !== -1 && end > start) return raw.slice(start, end + 1).trim()
+  // Case 4: Truncated — cố repair bằng cách đóng JSON
+  return repairJSON(raw.slice(start))
+}
+
+function repairJSON(partial: string): string {
+  // Đếm số dấu { và } để biết cần đóng bao nhiêu cấp
+  let depth = 0
+  let inString = false
+  let escape = false
+  for (const ch of partial) {
+    if (escape) { escape = false; continue }
+    if (ch === '\\') { escape = true; continue }
+    if (ch === '"' && !escape) { inString = !inString; continue }
+    if (!inString) {
+      if (ch === '{') depth++
+      else if (ch === '}') depth--
+    }
+  }
+  // Đóng string và object còn thiếu
+  let result = partial.trimEnd()
+  if (inString) result += '"'        // đóng string đang mở
+  result += ',\"do_tin_cay\":50'   // đảm bảo field quan trọng có giá trị
+  result += '}'.repeat(Math.max(0, depth))  // đóng object
+  return result
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
@@ -123,23 +158,8 @@ QUY TẮC:
 - Thà cảnh báo sai còn hơn reassure sai
 - Chỉ kết luận những gì nhìn thấy được
 
-JSON thuần túy:
-{
-  "loai_da": "tên loại đá",
-  "ten_khoa_hoc": "",
-  "xuat_xu_pho_bien": "",
-  "mau_sac": "mô tả màu",
-  "do_trong": "trong suốt / nửa trong / mờ đục",
-  "dac_diem_nhan_biet": "đặc điểm nhận ra từ ảnh",
-  "hinh_dang_gia_cong": "dạng vật phẩm",
-  "dau_hieu_tu_nhien": "dấu hiệu tự nhiên thấy được",
-  "canh_bao_co_the_gia": "nghi ngờ nếu có",
-  "muc_do_tu_nhien": "Có vẻ tự nhiên",
-  "nen_kiem_dinh": "test gì thêm",
-  "luu_y_khi_mua": "lưu ý khi mua",
-  "do_tin_cay": 70,
-  "ly_do_tin_cay": "lý do"
-}`
+JSON thuần túy, ngắn gọn — KHÔNG giải thích thêm:
+{"loai_da":"","ten_khoa_hoc":"","xuat_xu_pho_bien":"","mau_sac":"","do_trong":"","dac_diem_nhan_biet":"","hinh_dang_gia_cong":"","dau_hieu_tu_nhien":"","canh_bao_co_the_gia":"","muc_do_tu_nhien":"Có vẻ tự nhiên","nen_kiem_dinh":"","luu_y_khi_mua":"","do_tin_cay":70,"ly_do_tin_cay":""}`
 }
 
 // ── AI Callers ────────────────────────────────────────────────────────────────
@@ -186,7 +206,7 @@ async function callHaiku(
 
   const res = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1000,
+    max_tokens: 1500,
     system: buildHaikuSystem(declContext),
     messages: [{
       role: 'user',
