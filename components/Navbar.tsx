@@ -10,8 +10,8 @@ export default function Navbar() {
   const pathname = usePathname()
   const router   = useRouter()
   const supabase = createClient()
-  const [xu, setXu]       = useState<number | null>(null)
-  const [name, setName]   = useState('')
+  const [xu, setXu]     = useState<number | null>(null)
+  const [name, setName] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -47,14 +47,17 @@ export default function Navbar() {
   return (
     <nav style={{
       position: 'sticky', top: 0, zIndex: 200,
-      background: 'rgba(6,8,16,.88)', backdropFilter: 'blur(16px)',
+      background: '#FFFFFF',
+      backdropFilter: 'blur(8px)',
       borderBottom: '1px solid var(--border)',
+      boxShadow: '0 1px 4px rgba(0,0,0,.06)',
     }}>
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', height: 58 }}>
+
         {/* Logo */}
         <Link href="/appraise" style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 32 }}>
           <span style={{ fontSize: 18, color: 'var(--jade)', lineHeight: 1 }}>◈</span>
-          <span style={{ fontSize: 18, fontWeight: 300, letterSpacing: '.02em' }}>
+          <span style={{ fontSize: 18, fontWeight: 600, fontFamily: 'var(--font-serif)', letterSpacing: '.02em', color: 'var(--text)' }}>
             Ngọc <em style={{ fontStyle: 'italic', color: 'var(--jade)' }}>AI</em>
           </span>
         </Link>
@@ -63,10 +66,10 @@ export default function Navbar() {
         <div style={{ display: 'flex', gap: 2, flex: 1 }}>
           {links.map(l => (
             <Link key={l.href} href={l.href} style={{
-              padding: '6px 14px', borderRadius: 8, fontSize: 13,
-              fontFamily: 'var(--font-mono)', letterSpacing: '.04em',
-              color: pathname === l.href ? 'var(--text)' : 'var(--text-3)',
-              background: pathname === l.href ? 'var(--bg-3)' : 'transparent',
+              padding: '6px 14px', borderRadius: 8,
+              fontSize: 14, fontFamily: 'var(--font-sans)', fontWeight: 500,
+              color: pathname === l.href ? 'var(--jade-text)' : 'var(--text-2)',
+              background: pathname === l.href ? 'var(--jade-light)' : 'transparent',
               transition: 'all .15s',
             }}>
               {l.label}
@@ -77,11 +80,16 @@ export default function Navbar() {
         {/* Right side */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {xu !== null && <XuBadge xu={xu} size="sm" />}
-          <span style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{name}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{name}</span>
           <button onClick={logout} style={{
-            background: 'var(--bg-3)', border: '1px solid var(--border)',
-            color: 'var(--text-3)', borderRadius: 8,
-            padding: '5px 12px', fontSize: 11, fontFamily: 'var(--font-mono)',
+            background: 'var(--bg-3)',
+            border: '1.5px solid #D1D5DB',
+            color: 'var(--text-2)',
+            borderRadius: 8,
+            padding: '5px 12px',
+            fontSize: 12,
+            fontFamily: 'var(--font-sans)',
+            fontWeight: 500,
           }}>
             Logout
           </button>
