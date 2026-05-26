@@ -11,8 +11,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi">
       {/*
-        Font được load qua @import trong globals.css (Cormorant + Inter + DM Mono).
-        Không cần next/font vì đã có Google Fonts import trực tiếp.
+        Fonts: Playfair Display (tiêu đề serif, hỗ trợ dấu tiếng Việt tốt)
+               Inter (body sans-serif, tối ưu màn hình)
+               DM Mono (số liệu, code)
+        Đều được load qua @import trong globals.css.
       */}
       <body>{children}</body>
     </html>
