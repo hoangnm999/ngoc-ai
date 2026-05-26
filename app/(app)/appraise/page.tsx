@@ -292,9 +292,23 @@ export default function AppraisePage() {
 
   const handleRetry = () => { setBlocked(null); setResult(null); setError('') }
 
+  // Tạo hash nhẹ từ b64 (lấy 200 ký tự đầu + size) — đủ detect ảnh trùng
+  const imageHash = (b64: string) => b64.slice(0, 200) + b64.length
+
   const analyze = async () => {
     if (!canAnalyze) return
     setLoading(true); setError(''); setResult(null); setBlocked(null)
+
+    // Bug 2 fix: Detect duplicate images trước khi gọi API
+    const slotImages = SHOT_SLOTS.filter(s => images[s.id]).map(s => images[s.id])
+    const hashes = slotImages.map(img => imageHash(img.b64))
+    const uniqueHashes = new Set(hashes)
+    if (uniqueHashes.size < hashes.length) {
+      const dupCount = hashes.length - uniqueHashes.size
+      setError(`Phát hiện ${dupCount} ảnh trùng lặp. Vui lòng chọn ảnh từ các góc chụp khác nhau.`)
+      setLoading(false)
+      return
+    }
 
     const imgPayload = [
       ...SHOT_SLOTS.filter(s => images[s.id]).map(s => ({
