@@ -302,6 +302,21 @@ function runHallucinationGuard(
     if (level === 'SAFE') level = 'WARNING'
   }
 
+  // Lớp 5: Xung đột muc_do_tu_nhien giữa các AI
+  if (valid.length >= 2) {
+    const natureLevels = valid.map(r => r.muc_do_tu_nhien).filter(Boolean)
+    const uniqueNature = new Set(natureLevels)
+    const hasNatural   = natureLevels.some(n => n === 'Có vẻ tự nhiên')
+    const hasSynthetic = natureLevels.some(n => n === 'Có thể nhân tạo')
+    if (hasNatural && hasSynthetic) {
+      reasons.push('2 AI mâu thuẫn về tính tự nhiên: một cho là tự nhiên, một cho là nhân tạo — cần kiểm định')
+      if (level === 'SAFE') level = 'WARNING'
+    } else if (uniqueNature.size >= 2) {
+      reasons.push(`2 AI không đồng thuận mức độ tự nhiên: ${Array.from(uniqueNature).join(' / ')}`)
+      if (level === 'SAFE') level = 'WARNING'
+    }
+  }
+
   const suggestion =
     level === 'BLOCKED'
       ? 'Vui lòng chụp lại: ánh sáng tự nhiên, nền trắng/đen, ảnh sắc nét tối thiểu 3 góc. Sau đó thử lại.'
