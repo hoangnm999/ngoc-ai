@@ -1,88 +1,161 @@
 /* app/globals.css */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
+/* ─────────────────────────────────────────────
+   CSS VARIABLES — Light mode, warm palette
+   Tối ưu cho người dùng 40-60 tuổi, tiếng Việt
+───────────────────────────────────────────── */
 :root {
-  --bg:        #060810;
-  --bg-2:      #0c0f1a;
-  --bg-3:      #111627;
-  --border:    rgba(255,255,255,0.07);
-  --border-2:  rgba(255,255,255,0.12);
-  --text:      #e8eaf0;
-  --text-2:    #8892a4;
-  --text-3:    #434e63;
-  --jade:      #5eead4;   /* teal — màu ngọc bích */
-  --gold:      #d4a853;   /* vàng — sang trọng */
-  --ruby:      #e05c7a;   /* đỏ — ruby */
-  --indigo:    #6366f1;
-  --glow-jade: rgba(94,234,212,0.15);
-  --glow-gold: rgba(212,168,83,0.15);
-  --radius:    14px;
-  --radius-sm: 8px;
-  --font-serif: 'Cormorant', 'Georgia', serif;
+  /* Backgrounds — trắng ngà ấm */
+  --bg:        #FDFBF7;
+  --bg-2:      #FFFFFF;
+  --bg-3:      #F4F1EA;
+
+  /* Borders */
+  --border:    #E5E2DA;
+  --border-2:  #D0CCC2;
+
+  /* Text — đen ấm, tương phản cao */
+  --text:      #1C1B1A;
+  --text-2:    #5C5A56;
+  --text-3:    #9C9890;
+
+  /* Brand — Ngọc AI */
+  --jade:       #0D9488;
+  --jade-hover: #0F766E;
+  --jade-light: #CCFBF1;
+  --jade-text:  #0F766E;
+  --gold:       #B45309;
+  --gold-light: #FEF3C7;
+  --ruby:       #DC2626;
+  --indigo:     #4F46E5;
+
+  /* Glow — nhẹ hơn trên nền sáng */
+  --glow-jade: rgba(13,148,136,0.10);
+  --glow-gold: rgba(180,83,9,0.08);
+
+  /* Radii */
+  --radius:    16px;
+  --radius-sm: 10px;
+
+  /* Fonts */
+  --font-serif: 'Playfair Display', 'Georgia', serif;
+  --font-sans:  'Inter', 'Helvetica Neue', 'Arial', sans-serif;
   --font-mono:  'DM Mono', 'Courier New', monospace;
 }
 
+/* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
+/* ── Base body ── */
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-serif);
-  font-size: 16px;
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  font-size: 18px;          /* ← 18px cho user lớn tuổi */
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  /* Grain texture overlay */
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 99px; }
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-3); }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 /* ── Keyframes ── */
-@keyframes fadeUp   { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
-@keyframes spinR    { to { transform:rotate(360deg); } }
-@keyframes shimmer  { 0%,100% { opacity:.5; } 50% { opacity:1; } }
-@keyframes pulse    { 0%,100% { transform:scale(1); opacity:.6; } 50% { transform:scale(1.08); opacity:1; } }
-@keyframes glow-in  { from { box-shadow:0 0 0 rgba(94,234,212,0); } to { box-shadow:0 0 32px rgba(94,234,212,.2); } }
-@keyframes bar-fill { from { width:0; } to { width:var(--w); } }
+@keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
+@keyframes spinR     { to { transform:rotate(360deg); } }
+@keyframes shimmer   {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+@keyframes pulse     { 0%,100% { transform:scale(1); opacity:.6; } 50% { transform:scale(1.06); opacity:1; } }
+@keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
 
-/* ── Utility ── */
-.fade-up   { animation: fadeUp  .5s cubic-bezier(.16,1,.3,1) both; }
-.fade-up-2 { animation: fadeUp  .5s cubic-bezier(.16,1,.3,1) .1s both; }
-.fade-up-3 { animation: fadeUp  .5s cubic-bezier(.16,1,.3,1) .2s both; }
-.fade-in   { animation: fadeIn  .4s ease both; }
+/* ── Utility classes ── */
+.fade-up   { animation: fadeUp  .45s cubic-bezier(.16,1,.3,1) both; }
+.fade-up-2 { animation: fadeUp  .45s cubic-bezier(.16,1,.3,1) .08s both; }
+.fade-up-3 { animation: fadeUp  .45s cubic-bezier(.16,1,.3,1) .16s both; }
+.fade-in   { animation: fadeIn  .35s ease both; }
 .spin      { animation: spinR   .75s linear infinite; }
 
-/* ── Base elements ── */
-input, textarea {
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #F4F1EA 25%, #E8E4DB 50%, #F4F1EA 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+/* ── Typography ── */
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  line-height: 1.2;
+  color: var(--text);
+}
+h1 { font-size: 56px; font-weight: 700; letter-spacing: -.02em; }
+h2 { font-size: 40px; font-weight: 600; }
+h3 { font-size: 32px; font-weight: 600; }
+
+@media (max-width: 768px) {
+  h1 { font-size: 40px; }
+  h2 { font-size: 32px; }
+  h3 { font-size: 26px; }
+}
+
+/* ── Inputs ── */
+input, textarea, select {
   background: var(--bg-2);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-2);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  padding: 11px 14px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  padding: 12px 16px;
   width: 100%;
   transition: border-color .2s, box-shadow .2s;
   outline: none;
+  line-height: 1.5;
 }
-input:focus, textarea:focus {
-  border-color: rgba(94,234,212,.4);
-  box-shadow: 0 0 0 3px rgba(94,234,212,.06);
+input:focus, textarea:focus, select:focus {
+  border-color: var(--jade);
+  box-shadow: 0 0 0 3px rgba(13,148,136,.12);
 }
-input::placeholder { color: var(--text-3); }
+input::placeholder, textarea::placeholder { color: var(--text-3); }
 
+/* ── Buttons (base) ── */
 button {
   cursor: pointer;
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   border: none;
   outline: none;
   transition: all .2s ease;
 }
+button:focus-visible {
+  outline: 2.5px solid var(--jade);
+  outline-offset: 3px;
+}
+button:disabled { cursor: not-allowed; }
 
-a { color: inherit; text-decoration: none; }
+/* ── Links ── */
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color .15s;
+}
+a:focus-visible {
+  outline: 2px solid var(--jade);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  body    { font-size: 16px; }
+  input, textarea { font-size: 16px; } /* prevent iOS zoom */
+}
