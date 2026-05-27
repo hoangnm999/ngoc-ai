@@ -553,10 +553,6 @@ export default function AppraisePage() {
           )}
 
           {/* Disclaimer */}
-          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
-            Token: {result.usage.input_tokens.toLocaleString()} in + {result.usage.output_tokens.toLocaleString()} out
-            {' · '}~${result.usage.cost_usd.toFixed(4)} USD
-          </div>
           <div style={{ marginTop: 12, padding: '12px 16px', borderRadius: 8, background: 'var(--bg-3)', border: '1px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
             ※ Kết quả mang tính tham khảo sơ bộ — không thay thế giám định chuyên nghiệp.<br />
             Giao dịch giá trị cao nên có chứng thư từ GIA / GRS / IGI hoặc trung tâm giám định uy tín tại Việt Nam.
