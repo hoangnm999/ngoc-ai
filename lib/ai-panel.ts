@@ -68,24 +68,35 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
 }
 
 function extractJSON(raw: string): string {
-  // Case 1: JSON trong markdown fence hoàn chỉnh
+  // Case 1: JSON trong markdown fence HOÀN CHỈNH (có closing ```)
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (fenced) {
     const inner = fenced[1].trim()
-    // Nếu là array, lấy phần tử đầu tiên
     if (inner.startsWith('[')) {
       const arrMatch = inner.match(/^\s*\[\s*(\{[\s\S]*\})/)
       if (arrMatch) return repairJSON(arrMatch[1])
     }
-    return inner
+    return repairJSON(inner)
   }
-  // Case 2: JSON không có fence
+
+  // Case 2: JSON trong markdown fence BỊ TRUNCATE (thiếu closing ```)
+  // Đây là lỗi thực tế trong log: ```json\n{ ... bị cắt giữa chừng
+  const truncatedFence = raw.match(/```(?:json)?\s*([\s\S]*)$/)
+  if (truncatedFence) {
+    const inner = truncatedFence[1].trim()
+    const start = inner.indexOf('{')
+    if (start !== -1) return repairJSON(inner.slice(start))
+  }
+
+  // Case 3: JSON không có fence
   const start = raw.indexOf('{')
   if (start === -1) return raw.trim()
-  // Case 3: JSON bị truncate — tìm closing brace cuối cùng hợp lệ
+
+  // Case 4: JSON đầy đủ (có cả { và })
   const end = raw.lastIndexOf('}')
   if (end !== -1 && end > start) return raw.slice(start, end + 1).trim()
-  // Case 4: Truncated — cố repair bằng cách đóng JSON
+
+  // Case 5: JSON bị truncate không có fence
   return repairJSON(raw.slice(start))
 }
 
@@ -103,11 +114,18 @@ function repairJSON(partial: string): string {
       else if (ch === '}') depth--
     }
   }
-  // Đóng string và object còn thiếu
   let result = partial.trimEnd()
-  if (inString) result += '"'        // đóng string đang mở
-  result += ',\"do_tin_cay\":50'   // đảm bảo field quan trọng có giá trị
-  result += '}'.repeat(Math.max(0, depth))  // đóng object
+
+  // Đóng string đang mở (nếu bị cắt giữa value)
+  if (inString) result += '"'
+
+  // Chỉ thêm do_tin_cay nếu chưa có trong partial
+  if (!partial.includes('"do_tin_cay"')) {
+    result += ',"do_tin_cay":50,"ly_do_tin_cay":"Response bị cắt — độ tin cậy giảm xuống 50%"'
+  }
+
+  // Đóng object còn thiếu
+  result += '}'.repeat(Math.max(0, depth))
   return result
 }
 
@@ -164,6 +182,42 @@ JSON thuần túy, ngắn gọn — KHÔNG giải thích thêm:
 
 // ── AI Callers ────────────────────────────────────────────────────────────────
 
+// Fallback: extract từng field bằng regex khi JSON quá hỏng để parse
+function extractPartialFields(raw: string): AIResult | null {
+  const get = (key: string): string => {
+    const m = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`))
+    return m ? m[1].replace(/\\"/g, '"') : ''
+  }
+  const getNum = (key: string, fallback: number): number => {
+    const m = raw.match(new RegExp(`"${key}"\\s*:\\s*(\\d+)`))
+    return m ? parseInt(m[1], 10) : fallback
+  }
+
+  const loai_da = get('loai_da')
+  if (!loai_da) return null  // không tìm được field quan trọng nhất → bỏ
+
+  const mucDoRaw = get('muc_do_tu_nhien')
+  const validLevels = ['Có vẻ tự nhiên', 'Cần kiểm định', 'Nghi ngờ xử lý', 'Có thể nhân tạo'] as const
+  const muc_do_tu_nhien = validLevels.find(l => mucDoRaw.includes(l)) ?? 'Cần kiểm định'
+
+  return {
+    loai_da,
+    ten_khoa_hoc:        get('ten_khoa_hoc')        || undefined,
+    xuat_xu_pho_bien:    get('xuat_xu_pho_bien')    || undefined,
+    mau_sac:             get('mau_sac')             || 'Không xác định',
+    do_trong:            get('do_trong')            || 'Không xác định',
+    dac_diem_nhan_biet:  get('dac_diem_nhan_biet')  || 'Dữ liệu không đầy đủ',
+    hinh_dang_gia_cong:  get('hinh_dang_gia_cong')  || '',
+    dau_hieu_tu_nhien:   get('dau_hieu_tu_nhien')   || '',
+    canh_bao_co_the_gia: get('canh_bao_co_the_gia') || '',
+    muc_do_tu_nhien,
+    nen_kiem_dinh:       get('nen_kiem_dinh')       || '',
+    luu_y_khi_mua:       get('luu_y_khi_mua')       || '',
+    do_tin_cay:          getNum('do_tin_cay', 45),
+    ly_do_tin_cay:       get('ly_do_tin_cay')       || 'JSON response bị cắt — các trường có thể thiếu',
+  }
+}
+
 async function callSonnet(
   imageBlocks: Array<{ type: 'image'; source: Anthropic.ImageBlockParam['source'] }>,
   declContext?: string
@@ -173,7 +227,7 @@ async function callSonnet(
 
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1500,
+    max_tokens: 2500,   // tăng từ 1500 — Emerald/Ruby có schema dài cần ~1800 tokens
     system: buildSonnetSystem(declContext),
     messages: [{
       role: 'user',
@@ -193,6 +247,15 @@ async function callSonnet(
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
+    // Fallback: thử extract từng field bằng regex
+    const partial = extractPartialFields(text)
+    if (partial) {
+      console.log('[Sonnet] JSON repair failed, using partial field extraction')
+      return {
+        result: partial,
+        usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+      }
+    }
     throw new Error(`Sonnet JSON parse failed: ${text.slice(0, 200)}`)
   }
 }
@@ -226,6 +289,15 @@ async function callHaiku(
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
+    // Fallback: thử extract từng field bằng regex
+    const partial = extractPartialFields(text)
+    if (partial) {
+      console.log('[Haiku] JSON repair failed, using partial field extraction')
+      return {
+        result: partial,
+        usage: res.usage || { input_tokens: 0, output_tokens: 0 },
+      }
+    }
     throw new Error(`Haiku JSON parse failed: ${text.slice(0, 200)}`)
   }
 }
