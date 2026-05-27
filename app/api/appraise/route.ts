@@ -5,6 +5,24 @@ import { runAIPanel } from '@/lib/ai-panel'
 
 export const maxDuration = 60
 
+// Helper: hoàn xu an toàn — không throw nếu fail
+async function refundXu(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  amount: number,
+  note: string
+) {
+  const { error } = await admin.rpc('admin_add_xu', {
+    admin_id: userId,
+    user_id:  userId,
+    amount,
+    note,
+  })
+  if (error) console.error('[appraise] refund failed:', error.message)
+}
+
+
+
 const XU_PER_APPRAISAL = 2
 
 export async function POST(req: NextRequest) {
@@ -87,12 +105,7 @@ export async function POST(req: NextRequest) {
     } catch (aiErr: unknown) {
       // AI call hoàn toàn crash (không phải partial fail) → hoàn xu
       console.error('[appraise] AI panel crashed, refunding xu:', aiErr)
-      await admin.rpc('admin_add_xu', {
-        admin_id: user.id,  // dùng tạm user.id, RPC này cần được review
-        user_id:  user.id,
-        amount:   XU_PER_APPRAISAL,
-        note:     'Hoàn xu tự động — AI không phản hồi',
-      }).catch(e => console.error('[appraise] refund failed:', e))
+      await refundXu(admin, user.id, XU_PER_APPRAISAL, 'Hoàn xu tự động — AI không phản hồi')
 
       return NextResponse.json(
         { error: 'AI không phản hồi. Xu đã được hoàn. Vui lòng thử lại.' },
@@ -105,12 +118,7 @@ export async function POST(req: NextRequest) {
       .filter(Boolean).length
 
     if (successCount === 0) {
-      await admin.rpc('admin_add_xu', {
-        admin_id: user.id,
-        user_id:  user.id,
-        amount:   XU_PER_APPRAISAL,
-        note:     'Hoàn xu tự động — tất cả AI fail',
-      }).catch(e => console.error('[appraise] refund failed:', e))
+      await refundXu(admin, user.id, XU_PER_APPRAISAL, 'Hoàn xu tự động — tất cả AI fail')
 
       return NextResponse.json({
         error: 'Tất cả AI không phản hồi. Xu đã được hoàn. Vui lòng thử lại sau.',
@@ -121,12 +129,7 @@ export async function POST(req: NextRequest) {
     // 6. GUARD BLOCKED → hoàn xu, trả về lý do để user sửa ảnh
     if (panelResult.guard.blocked) {
       // Hoàn xu vì ảnh chưa đủ chất lượng
-      await admin.rpc('admin_add_xu', {
-        admin_id: user.id,
-        user_id:  user.id,
-        amount:   XU_PER_APPRAISAL,
-        note:     'Hoàn xu tự động — Guard BLOCKED',
-      }).catch(e => console.error('[appraise] refund failed:', e))
+      await refundXu(admin, user.id, XU_PER_APPRAISAL, 'Hoàn xu tự động — Guard BLOCKED')
 
       return NextResponse.json({
         guard: panelResult.guard,
