@@ -156,7 +156,7 @@ JSON SCHEMA (trả về JSON thuần túy, không markdown):
   "hinh_dang_gia_cong": "dạng vật phẩm và kiểu gia công",
   "dau_hieu_tu_nhien": "dấu hiệu tự nhiên quan sát thấy",
   "canh_bao_co_the_gia": "nghi ngờ xử lý/nhân tạo nếu có, hoặc chuỗi rỗng",
-  "muc_do_tu_nhien": "Có vẻ tự nhiên",
+  "muc_do_tu_nhien": "PHẢI là một trong 4 giá trị chính xác sau, KHÔNG thêm text khác: Có vẻ tự nhiên | Cần kiểm định | Nghi ngờ xử lý | Có thể nhân tạo",
   "nen_kiem_dinh": "nên test gì thêm để xác nhận",
   "luu_y_khi_mua": "lời khuyên thực tế cho người mua loại đá này",
   "do_tin_cay": 75,
@@ -176,8 +176,10 @@ QUY TẮC:
 - Thà cảnh báo sai còn hơn reassure sai
 - Chỉ kết luận những gì nhìn thấy được
 
-JSON thuần túy, ngắn gọn — KHÔNG giải thích thêm:
-{"loai_da":"","ten_khoa_hoc":"","xuat_xu_pho_bien":"","mau_sac":"","do_trong":"","dac_diem_nhan_biet":"","hinh_dang_gia_cong":"","dau_hieu_tu_nhien":"","canh_bao_co_the_gia":"","muc_do_tu_nhien":"Có vẻ tự nhiên","nen_kiem_dinh":"","luu_y_khi_mua":"","do_tin_cay":70,"ly_do_tin_cay":""}`
+JSON thuần túy — KHÔNG giải thích thêm. QUAN TRỌNG:
+- do_trong = mô tả độ trong suốt (ví dụ: "trong suốt", "nửa trong", "mờ đục") — KHÔNG phải độ cứng Mohs
+- muc_do_tu_nhien = PHẢI là một trong 4 giá trị CHÍNH XÁC: "Có vẻ tự nhiên" | "Cần kiểm định" | "Nghi ngờ xử lý" | "Có thể nhân tạo"
+{"loai_da":"","ten_khoa_hoc":"","xuat_xu_pho_bien":"","mau_sac":"","do_trong":"trong suốt/nửa trong/mờ đục","dac_diem_nhan_biet":"","hinh_dang_gia_cong":"","dau_hieu_tu_nhien":"","canh_bao_co_the_gia":"","muc_do_tu_nhien":"Cần kiểm định","nen_kiem_dinh":"","luu_y_khi_mua":"","do_tin_cay":70,"ly_do_tin_cay":""}`
 }
 
 // ── AI Callers ────────────────────────────────────────────────────────────────
@@ -227,7 +229,7 @@ async function callSonnet(
 
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2500,   // tăng từ 1500 — Emerald/Ruby có schema dài cần ~1800 tokens
+    max_tokens: 2000,   // đủ cho đá phức tạp (~1700 tokens) mà không kéo dài response time
     system: buildSonnetSystem(declContext),
     messages: [{
       role: 'user',
@@ -318,6 +320,20 @@ function normalizeStoneType(s: string): string {
   return l.split(/[\s\(\-]/)[0]
 }
 
+// Normalize muc_do_tu_nhien — AI đôi khi trả về chuỗi tự do thay vì enum
+// Ví dụ: "Có vẻ tự nhiên — cần kiểm định..." → "Cần kiểm định"
+function normalizeNatureLevel(raw: string): AIResult['muc_do_tu_nhien'] {
+  if (!raw) return 'Cần kiểm định'
+  const s = raw.toLowerCase()
+  if (s.startsWith('có vẻ tự nhiên') && !s.includes('cần') && !s.includes('nghi')) return 'Có vẻ tự nhiên'
+  if (s.includes('nhân tạo') || s.includes('synthetic') || s.includes('giả')) return 'Có thể nhân tạo'
+  if (s.includes('nghi ngờ') || s.includes('xử lý') || s.includes('treated')) return 'Nghi ngờ xử lý'
+  if (s.includes('cần kiểm định') || s.includes('cần xác nhận') || s.includes('cần xác thực')) return 'Cần kiểm định'
+  // fallback: nếu có "tự nhiên" trong string → Cần kiểm định (an toàn hơn Có vẻ tự nhiên)
+  if (s.includes('tự nhiên')) return 'Cần kiểm định'
+  return 'Cần kiểm định'
+}
+
 // ── Hallucination Guard ───────────────────────────────────────────────────────
 
 function runHallucinationGuard(
@@ -367,7 +383,7 @@ function runHallucinationGuard(
 
   // Lớp 4: Cảnh báo hàng giả từ nhiều AI
   const suspectCount = valid.filter(r =>
-    r.muc_do_tu_nhien === 'Có thể nhân tạo' || r.muc_do_tu_nhien === 'Nghi ngờ xử lý'
+    normalizeNatureLevel(r.muc_do_tu_nhien) === 'Có thể nhân tạo' || normalizeNatureLevel(r.muc_do_tu_nhien) === 'Nghi ngờ xử lý'
   ).length
   if (suspectCount >= 2) {
     reasons.push('Cả 2 AI nghi ngờ đây là đá xử lý hoặc nhân tạo')
@@ -376,7 +392,7 @@ function runHallucinationGuard(
 
   // Lớp 5: Xung đột muc_do_tu_nhien giữa các AI
   if (valid.length >= 2) {
-    const natureLevels = valid.map(r => r.muc_do_tu_nhien).filter(Boolean)
+    const natureLevels = valid.map(r => normalizeNatureLevel(r.muc_do_tu_nhien)).filter(Boolean)
     const uniqueNature = new Set(natureLevels)
     const hasNatural   = natureLevels.some(n => n === 'Có vẻ tự nhiên')
     const hasSynthetic = natureLevels.some(n => n === 'Có thể nhân tạo')
@@ -415,7 +431,7 @@ function buildConsensus(results: (AIResult | null)[]): ConsensusResult | null {
   const topType = Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0]
 
   // Mức độ tự nhiên được đa số đồng ý
-  const natureLevels = valid.map(r => r.muc_do_tu_nhien).filter(Boolean)
+  const natureLevels = valid.map(r => normalizeNatureLevel(r.muc_do_tu_nhien)).filter(Boolean)
   const natureCount = natureLevels.reduce<Record<string, number>>((o, n) => {
     o[n] = (o[n] ?? 0) + 1; return o
   }, {})
