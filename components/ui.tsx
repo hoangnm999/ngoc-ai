@@ -150,9 +150,9 @@ export function XuBadge({ xu, size = 'md' }: { xu: number; size?: 'sm'|'md' }) {
 export function Label({ children }: { children: ReactNode }) {
   return (
     <div style={{
-      fontSize: 12, letterSpacing: '.15em', textTransform: 'uppercase',
-      color: 'var(--text-3)', fontFamily: 'var(--font-mono)',
-      marginBottom: 14, fontWeight: 500,
+      fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
+      color: 'var(--text-3)', fontFamily: 'var(--font-sans)',
+      marginBottom: 14, fontWeight: 600,
     }}>
       {children}
     </div>
