@@ -37,9 +37,10 @@ export function Btn({
   }
   const variants: Record<BtnVariant, CSSProperties> = {
     jade: {
-      background: 'var(--jade)',
+      background: 'linear-gradient(135deg, #B8860B 0%, #DAA520 40%, #CD9B1D 70%, #A07700 100%)',
       color: '#fff',
-      boxShadow: '0 2px 10px rgba(13,148,136,.22)',
+      boxShadow: '0 2px 14px rgba(184,134,11,.28)',
+      textShadow: '0 1px 2px rgba(0,0,0,.15)',
     },
     primary: {
       background: 'linear-gradient(135deg,#4f46e5,#6366f1)',
@@ -60,7 +61,7 @@ export function Btn({
 
   /* Hover via onMouseEnter/Leave — không cần Tailwind */
   const hoverStyle: Record<BtnVariant, CSSProperties> = {
-    jade:    { background: 'var(--jade-hover)', boxShadow: '0 4px 16px rgba(13,148,136,.30)', transform: 'scale(1.02)' },
+    jade:    { background: 'var(--gradient-gold-hover)', boxShadow: '0 6px 20px var(--gold-glow)', transform: 'scale(1.02)' },
     primary: { background: 'linear-gradient(135deg,#4338ca,#4f46e5)', boxShadow: '0 4px 16px rgba(99,102,241,.30)', transform: 'scale(1.02)' },
     ghost:   { background: 'var(--bg-3)', transform: 'scale(1.01)' },
     danger:  { background: '#FEE2E2', transform: 'scale(1.01)' },
@@ -75,8 +76,14 @@ export function Btn({
     if (disabled) return
     const v = variants[variant]
     e.currentTarget.style.transform = 'scale(1)'
-    e.currentTarget.style.background = (v.background as string) ?? ''
-    e.currentTarget.style.boxShadow  = (v.boxShadow  as string) ?? ''
+    // Reset về gradient string gốc (không dùng CSS variable trực tiếp trong inline style reset)
+    if (variant === 'jade') {
+      e.currentTarget.style.background = 'linear-gradient(135deg, #B8860B 0%, #DAA520 40%, #CD9B1D 70%, #A07700 100%)'
+      e.currentTarget.style.boxShadow  = '0 2px 14px rgba(184,134,11,.28)'
+    } else {
+      e.currentTarget.style.background = (v.background as string) ?? ''
+      e.currentTarget.style.boxShadow  = (v.boxShadow  as string) ?? ''
+    }
   }
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled) return
