@@ -181,7 +181,7 @@ function BlockedPanel({ data, onRetry }: { data: BlockedResult; onRetry: () => v
       </Card>
       <div style={{ textAlign: 'center' }}>
         <Btn variant="jade" onClick={onRetry} style={{ padding: '12px 40px' }}>↺ Thử lại với ảnh mới</Btn>
-        <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10, fontFamily: 'var(--font-mono)' }}>Xu không bị trừ khi ảnh chưa đủ</p>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 10, fontFamily: 'var(--font-sans)' }}>Xu không bị trừ khi ảnh chưa đủ</p>
       </div>
     </div>
   )
@@ -191,7 +191,7 @@ function InfoRow({ label, value, color }: { label: string; value?: string; color
   if (!value) return null
   return (
     <div style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-      <span style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, minWidth: 140, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 500, minWidth: 140, flexShrink: 0 }}>{label}</span>
       <span style={{ fontSize: 14, color: color || 'var(--text)', lineHeight: 1.6 }}>{value}</span>
     </div>
   )
@@ -216,7 +216,7 @@ function AICard({ name, color, vendor, role, result, error }: {
         <span style={{ fontSize: 16, color }}>'◈'</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{name}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{role}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-sans)' }}>{role}</div>
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-2)', background: 'var(--bg-3)', padding: '2px 8px', borderRadius: 99, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{vendor}</span>
       </div>
@@ -227,7 +227,7 @@ function AICard({ name, color, vendor, role, result, error }: {
         <div>
           {/* Loại đá — nổi bật */}
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 4 }}>LOẠI ĐÁ</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '.06em', marginBottom: 4 }}>LOẠI ĐÁ</div>
             <div style={{ fontSize: 17, fontWeight: 700, color, lineHeight: 1.3 }}>{result.loai_da}</div>
             {result.ten_khoa_hoc && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', marginTop: 2 }}>{result.ten_khoa_hoc}</div>
@@ -358,7 +358,7 @@ export default function AppraisePage() {
             <h1 style={{ fontSize: 'clamp(32px,4vw,56px)', fontWeight: 300, letterSpacing: '-.01em', marginBottom: 4 }}>
               Nhận diện <em style={{ color: 'var(--jade)', fontStyle: 'italic' }}>Ngọc & Đá quý</em>
             </h1>
-            <p style={{ fontSize: 15, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            <p style={{ fontSize: 15, color: 'var(--text-2)', fontFamily: 'var(--font-sans)', lineHeight: 1.6 }}>
               2 AI phân tích · Nhận diện loại đá · Thông tin tham khảo · Không định giá
             </p>
           </div>
@@ -381,7 +381,7 @@ export default function AppraisePage() {
       <Card style={{ padding: 28, marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <Label>Ảnh chụp (tối thiểu 3)</Label>
-          <span style={{ fontSize: 15, fontFamily: 'var(--font-mono)', fontWeight: 600, color: filled >= 3 ? 'var(--jade)' : '#B45309' }}>
+          <span style={{ fontSize: 14, fontFamily: 'var(--font-sans)', fontWeight: 700, color: filled >= 3 ? 'var(--jade)' : '#B45309' }}>
             {filled} / 3 bắt buộc
           </span>
         </div>
@@ -450,7 +450,7 @@ export default function AppraisePage() {
       {/* Analyze Button */}
       <div style={{ textAlign: 'center', marginBottom: 36 }}>
         {filled < 3 && (
-          <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: 12 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', fontFamily: 'var(--font-sans)', marginBottom: 12, lineHeight: 1.6 }}>
             Cần thêm {3 - filled} ảnh nữa
           </p>
         )}
@@ -477,14 +477,14 @@ export default function AppraisePage() {
               <div style={{ marginTop: 12 }}>
                 {/* Loại đá */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 4 }}>LOẠI ĐÁ</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '.06em', marginBottom: 4 }}>LOẠI ĐÁ</div>
                   <div style={{ fontSize: 30, fontWeight: 700, fontFamily: 'var(--font-serif)', color: 'var(--jade)', lineHeight: 1.2 }}>{cons.loai_da}</div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                   {/* Mức độ tự nhiên */}
                   <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 6 }}>TÍNH TỰ NHIÊN</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>TÍNH TỰ NHIÊN</div>
                     {(() => {
                       const cfg = NATURAL_CFG[cons.muc_do_tu_nhien] ?? NATURAL_CFG['Cần kiểm định']
                       return (
@@ -498,7 +498,7 @@ export default function AppraisePage() {
 
                   {/* Confidence */}
                   <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 6 }}>ĐỘ TIN CẬY NHẬN DIỆN</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>ĐỘ TIN CẬY NHẬN DIỆN</div>
                     <div style={{ fontSize: 26, fontWeight: 700, color: cons.do_tin_cay >= 70 ? 'var(--jade)' : cons.do_tin_cay >= 50 ? '#B45309' : '#DC2626', fontFamily: 'var(--font-mono)' }}>
                       {cons.do_tin_cay}%
                     </div>
@@ -506,7 +506,7 @@ export default function AppraisePage() {
 
                   {/* Đồng thuận */}
                   <div style={{ flex: 1, minWidth: 120 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 6 }}>ĐỒNG THUẬN</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>ĐỒNG THUẬN</div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: cons.dong_thuan >= 2 ? 'var(--jade)' : '#B45309' }}>
                       {cons.dong_thuan}/2 AI
                     </div>
