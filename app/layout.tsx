@@ -4,18 +4,17 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Ngọc AI — Nhận diện ngọc & đá quý',
-  description: 'Hệ thống nhận diện ngọc bích, ruby, sapphire bằng trí tuệ nhân tạo — 2 AI phân tích song song',
+  description: 'Hệ thống nhận diện ngọc bích, ruby, sapphire bằng trí tuệ nhân tạo',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      {/*
-        Fonts: Playfair Display (tiêu đề serif, hỗ trợ dấu tiếng Việt tốt)
-               Inter (body sans-serif, tối ưu màn hình)
-               DM Mono (số liệu, code)
-        Đều được load qua @import trong globals.css.
-      */}
+      <head>
+        {/* Preconnect tối ưu load time Google Fonts */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body>{children}</body>
     </html>
   )
