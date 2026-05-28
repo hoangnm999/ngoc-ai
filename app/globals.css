@@ -1,7 +1,16 @@
 /* app/globals.css */
 
 /* ── Font loading tối ưu: preconnect + swap ── */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+/*
+  Font strategy (4 font, 10 variants):
+  - Cormorant Garamond 600/700 + italic → H1, H2 (display heading lớn)
+  - Playfair Display 600/700 + italic   → H3, H4 (heading nhỏ, an toàn dấu Việt)
+  - Inter 400/500/600                   → body, UI, button
+  - DM Mono 400/500                     → số liệu, badge, code
+  Lý do dùng cả 2: Cormorant đẹp hơn ở size lớn (≥32px), Playfair an toàn hơn ở size nhỏ
+*/
 
 /*
   Font strategy (3 font, 8 variants tổng):
@@ -43,9 +52,16 @@
   --radius-sm: 0.625rem;
 
   /* Fonts — với fallback đầy đủ cho mọi OS */
-  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-sans:  'Inter', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono:  'DM Mono', 'Courier New', Courier, monospace;
+  --font-display: 'Cormorant Garamond', 'Playfair Display', Georgia, serif; /* H1, H2 */
+  --font-serif:   'Playfair Display', Georgia, 'Times New Roman', serif;    /* H3, H4 */
+  --font-sans:    'Inter', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:    'DM Mono', 'Courier New', Courier, monospace;
+
+  /* Gradient vàng/đồng — dùng cho jade button */
+  --gradient-gold: linear-gradient(135deg, #B8860B 0%, #DAA520 40%, #CD9B1D 70%, #A07700 100%);
+  --gradient-gold-hover: linear-gradient(135deg, #9A7209 0%, #C8941A 40%, #B8891B 70%, #8A6500 100%);
+  --gold-glow: rgba(184, 134, 11, 0.28);
+  --jade-glow: rgba(13, 148, 136, 0.20);
 
   /* Type scale — rem (scale theo browser preference) */
   --text-xs:   0.75rem;    /* 12px */
@@ -137,19 +153,29 @@ body {
 }
 
 /* ── Typography — Playfair cho heading, Inter cho body ── */
-h1, h2, h3, h4, h5, h6 {
+/* H1, H2: Cormorant Garamond — đẹp ở size lớn */
+h1, h2 {
+  font-family: var(--font-display);
+  color: var(--text);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* H3, H4: Playfair Display — an toàn dấu tiếng Việt ở size nhỏ hơn */
+h3, h4, h5, h6 {
   font-family: var(--font-serif);
   color: var(--text);
-  line-height: 1.3;         /* đủ rộng cho dấu tiếng Việt không bị cắt */
+  line-height: 1.3;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 
 /* Desktop heading sizes */
-h1 { font-size: var(--text-5xl); }  /* 56px */
-h2 { font-size: var(--text-4xl); }  /* 40px */
-h3 { font-size: var(--text-3xl); }  /* 32px */
-h4 { font-size: var(--text-2xl); }  /* 24px */
+h1 { font-size: var(--text-5xl); }  /* 56px — Cormorant tỏa sáng */
+h2 { font-size: var(--text-4xl); }  /* 40px — Cormorant */
+h3 { font-size: var(--text-3xl); }  /* 32px — Playfair */
+h4 { font-size: var(--text-2xl); }  /* 24px — Playfair */
 
 /* ── Inputs ── */
 input, textarea, select {
@@ -210,9 +236,9 @@ a:focus-visible {
     font-size: var(--text-base); /* 16px */
   }
 
-  h1 { font-size: var(--text-4xl); }  /* 40px */
-  h2 { font-size: var(--text-3xl); }  /* 32px */
-  h3 { font-size: var(--text-2xl); }  /* 24px */
+  h1 { font-size: var(--text-4xl); }  /* 40px — Cormorant */
+  h2 { font-size: var(--text-3xl); }  /* 32px — Cormorant */
+  h3 { font-size: var(--text-2xl); }  /* 24px — Playfair */
 
   /* Dashboard packages: 3 cột → 1 cột */
   .pkg-grid {
