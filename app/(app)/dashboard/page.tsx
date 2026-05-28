@@ -63,10 +63,10 @@ export default function DashboardPage() {
   const pkg = PACKAGES.find(p => p.id === selected)
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '36px 24px 80px' }}>
+    <div style={{ maxWidth: '50rem', margin: '0 auto', padding: 'var(--space-10) var(--space-6) var(--space-16)' }}>
 
       {/* Header */}
-      <div className="fade-up" style={{ marginBottom: 36 }}>
+      <div className="fade-up" style={{ marginBottom: 'var(--space-10)' }}>
         <h1 style={{ marginBottom: 12 }}>
           Ví <em style={{ color: 'var(--jade)', fontStyle: 'italic' }}>xu</em>
         </h1>
@@ -83,15 +83,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Package selection */}
-      <div className="fade-up-2" style={{ marginBottom: 32 }}>
+      <div className="fade-up-2" style={{ marginBottom: 'var(--space-8)' }}>
         <Label>Chọn gói nạp xu</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div className="pkg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }}>
           {PACKAGES.map(p => (
             <div
               key={p.id}
               onClick={() => setSelected(p.id)}
               style={{
-                borderRadius: 16, padding: '22px 20px', cursor: 'pointer', position: 'relative',
+                borderRadius: 'var(--radius)', padding: 'var(--space-6) var(--space-4)', cursor: 'pointer', position: 'relative',
                 border: `2px solid ${selected === p.id ? p.color : 'var(--border)'}`,
                 background: selected === p.id ? `${p.color}0d` : 'var(--bg-2)',
                 transition: 'all .2s',
@@ -111,10 +111,10 @@ export default function DashboardPage() {
                   {p.badge}
                 </div>
               )}
-              <div style={{ fontSize: 26, fontWeight: 700, color: p.color, marginBottom: 6 }}>
+              <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: p.color, marginBottom: 'var(--space-2)' }}>
                 {p.xu} xu
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+              <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
                 {(p.price / 1000).toFixed(0)}k đ
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
@@ -137,9 +137,9 @@ export default function DashboardPage() {
       {/* Payment method + checkout */}
       {selected && (
         <div className="fade-up">
-          <Card style={{ padding: 28, marginBottom: 24 }}>
+          <Card style={{ padding: 'var(--space-8)', marginBottom: 'var(--space-6)' }}>
             <Label>Phương thức thanh toán</Label>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
+            <div className="pay-grid" style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-8)' }}>
               {[
                 { id: 'vnpay' as const, label: 'VNPay',  color: '#e2384d', desc: 'ATM / QR / Thẻ quốc tế' },
                 { id: 'momo'  as const, label: 'MoMo',   color: '#ae2070', desc: 'Ví MoMo / QR' },
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)' }}>
                 <span>Tổng</span>
                 <span>{((pkg?.price ?? 0) / 1000).toFixed(0)},000 đ</span>
               </div>
