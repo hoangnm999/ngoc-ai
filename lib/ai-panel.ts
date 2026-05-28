@@ -184,6 +184,41 @@ JSON thuần túy — KHÔNG giải thích thêm. QUAN TRỌNG:
 
 // ── AI Callers ────────────────────────────────────────────────────────────────
 
+// Làm sạch tên đá: bỏ tên lặp dạng "Emerald (Emerald)", "Ruby (Ruby)", "Đá lục bào (Emerald)"
+function cleanStoneName(name: string): string {
+  if (!name) return name
+
+  const dupMatch = name.match(/^([^(]+)\s*\(([^)]+)\)$/)
+  if (dupMatch) {
+    const before = dupMatch[1].trim()
+    const inside = dupMatch[2].trim()
+
+    // So sánh ASCII-only (bỏ dấu, lowercase) để bắt cả "Đá lục bào (Emerald)"
+    const toAscii = (s: string) => s.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')  // bỏ dấu
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z]/g, '')
+
+    const beforeAscii = toAscii(before)
+    const insideAscii = toAscii(inside)
+
+    // Trùng hoàn toàn hoặc một bên là substring của bên kia
+    if (
+      beforeAscii === insideAscii ||
+      insideAscii.startsWith(beforeAscii) ||
+      beforeAscii.startsWith(insideAscii) ||
+      beforeAscii.length > 3 && insideAscii.includes(beforeAscii) ||
+      insideAscii.length > 3 && beforeAscii.includes(insideAscii)
+    ) {
+      // Ưu tiên giữ phần có tiếng Việt (dài hơn hoặc có dấu) nếu có
+      const hasVietnamese = (s: string) => /[àáâãèéêìíòóôõùúýăđơư]/i.test(s)
+      return hasVietnamese(before) ? before : inside
+    }
+  }
+  return name
+}
+
 // Fallback: extract từng field bằng regex khi JSON quá hỏng để parse
 function extractPartialFields(raw: string): AIResult | null {
   const get = (key: string): string => {
@@ -203,7 +238,7 @@ function extractPartialFields(raw: string): AIResult | null {
   const muc_do_tu_nhien = validLevels.find(l => mucDoRaw.includes(l)) ?? 'Cần kiểm định'
 
   return {
-    loai_da,
+    loai_da: cleanStoneName(loai_da),
     ten_khoa_hoc:        get('ten_khoa_hoc')        || undefined,
     xuat_xu_pho_bien:    get('xuat_xu_pho_bien')    || undefined,
     mau_sac:             get('mau_sac')             || 'Không xác định',
@@ -245,7 +280,7 @@ async function callSonnet(
 
   try {
     return {
-      result: JSON.parse(extractJSON(text)) as AIResult,
+      result: (() => { const r = JSON.parse(extractJSON(text)) as AIResult; r.loai_da = cleanStoneName(r.loai_da); return r })(),
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
@@ -287,7 +322,7 @@ async function callHaiku(
 
   try {
     return {
-      result: JSON.parse(extractJSON(text)) as AIResult,
+      result: (() => { const r = JSON.parse(extractJSON(text)) as AIResult; r.loai_da = cleanStoneName(r.loai_da); return r })(),
       usage: res.usage || { input_tokens: 0, output_tokens: 0 },
     }
   } catch {
