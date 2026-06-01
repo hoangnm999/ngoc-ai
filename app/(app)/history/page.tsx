@@ -365,22 +365,21 @@ function HistoryCard({
   const hasWarning = d?.canh_bao_co_the_gia && d.canh_bao_co_the_gia.trim() !== ''
 
   return (
-    <div className="fade-up" style={{ animationDelay: `${index * 0.035}s` }}>
-      <Card style={{
-        padding: 0, overflow: 'hidden',
-        transition: 'box-shadow .2s, transform .2s',
+    <div
+      className="fade-up"
+      style={{ animationDelay: `${index * 0.035}s` }}
+      onMouseEnter={e => {
+        const el = e.currentTarget as HTMLDivElement
+        el.style.boxShadow = '0 8px 28px rgba(0,0,0,.1)'
+        el.style.transform = 'translateY(-2px)'
       }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLDivElement
-          el.style.boxShadow = '0 8px 28px rgba(0,0,0,.1)'
-          el.style.transform = 'translateY(-2px)'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLDivElement
-          el.style.boxShadow = ''
-          el.style.transform = ''
-        }}
-      >
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLDivElement
+        el.style.boxShadow = ''
+        el.style.transform = ''
+      }}
+    >
+      <Card style={{ padding: 0, overflow: 'hidden', transition: 'box-shadow .2s, transform .2s' }}>
         {/* Top: avatar + tên + badge */}
         <div style={{ padding: '18px 20px 14px' }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 12 }}>
