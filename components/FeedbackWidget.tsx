@@ -1,37 +1,34 @@
 // components/FeedbackWidget.tsx
-// Hiển thị 2 nút 👍 Đúng / 👎 Sai ngay dưới kết quả phân tích
-// Gọi POST /api/feedback khi user bấm
 'use client'
 import { useState } from 'react'
 
 interface FeedbackWidgetProps {
   appraisalId: string
-  stoneName: string  // hiển thị trong placeholder textarea
+  stoneName: string
 }
 
-type FeedbackState = 'idle' | 'submitted_correct' | 'awaiting_correction' | 'submitting' | 'done' | 'error'
+// Tách isSubmitting khỏi state để tránh TypeScript narrowing conflict
+type FeedbackState = 'idle' | 'awaiting_correction' | 'done' | 'error'
 
-export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidgetProps) {
-  const [state, setState]           = useState<FeedbackState>('idle')
+export default function FeedbackWidget({ appraisalId, stoneName: _stoneName }: FeedbackWidgetProps) {
+  const [state, setState]             = useState<FeedbackState>('idle')
+  const [isSubmitting, setSubmitting] = useState(false)
   const [correctName, setCorrectName] = useState('')
-  const [comment, setComment]       = useState('')
-  const [errorMsg, setErrorMsg]     = useState('')
+  const [comment, setComment]         = useState('')
+  const [errorMsg, setErrorMsg]       = useState('')
 
-  // Submit đúng ngay
   const submitCorrect = async () => {
-    setState('submitting')
+    setSubmitting(true)
     await sendFeedback(true, null, null)
+    setSubmitting(false)
   }
 
-  // Bấm Sai → hiện form nhập tên đúng
-  const clickWrong = () => {
-    setState('awaiting_correction')
-  }
+  const clickWrong = () => setState('awaiting_correction')
 
-  // Submit sau khi nhập tên đúng
   const submitWrong = async () => {
-    setState('submitting')
+    setSubmitting(true)
     await sendFeedback(false, correctName || null, comment || null)
+    setSubmitting(false)
   }
 
   const sendFeedback = async (
@@ -45,14 +42,12 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appraisal_id: appraisalId, is_correct, correct_stone_name, user_comment }),
       })
-
       if (!res.ok) {
         const data = await res.json()
         setErrorMsg(data.error || 'Lỗi gửi feedback')
         setState('error')
         return
       }
-
       setState('done')
     } catch {
       setErrorMsg('Lỗi kết nối mạng')
@@ -60,22 +55,21 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
     }
   }
 
-  // ── Render ──
-
+  // ── Done ──
   if (state === 'done') {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '10px 14px', borderRadius: 8,
         background: '#ECFDF5', border: '1px solid #6EE7B7',
-        fontSize: 14, color: '#065F46',
-        fontFamily: 'var(--font-sans)',
+        fontSize: 14, color: '#065F46', fontFamily: 'var(--font-sans)',
       }}>
-        ✓ Cảm ơn phản hồi của bạn — giúp cải thiện độ chính xác cho Ngọc AI!
+        ✓ Cảm ơn phản hồi — giúp cải thiện độ chính xác cho Ngọc AI!
       </div>
     )
   }
 
+  // ── Error ──
   if (state === 'error') {
     return (
       <div style={{
@@ -84,16 +78,15 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
         fontSize: 13, color: '#991B1B', fontFamily: 'var(--font-sans)',
       }}>
         {errorMsg} —{' '}
-        <button
-          onClick={() => setState('idle')}
-          style={{ background: 'none', border: 'none', color: '#991B1B', cursor: 'pointer', textDecoration: 'underline', fontSize: 13 }}
-        >
-          Thử lại
-        </button>
+        <button onClick={() => setState('idle')} style={{
+          background: 'none', border: 'none', color: '#991B1B',
+          cursor: 'pointer', textDecoration: 'underline', fontSize: 13,
+        }}>Thử lại</button>
       </div>
     )
   }
 
+  // ── Awaiting correction form ──
   if (state === 'awaiting_correction') {
     return (
       <div style={{
@@ -104,16 +97,15 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
           Loại đá đúng là gì? (tùy chọn)
         </div>
         <input
-          placeholder={`Ví dụ: "Ruby" hoặc "Thạch anh tím"…`}
+          placeholder='Ví dụ: "Ruby" hoặc "Thạch anh tím"…'
           value={correctName}
           onChange={e => setCorrectName(e.target.value)}
           maxLength={200}
           style={{
             marginBottom: 8, fontSize: 14, padding: '8px 12px',
             background: 'var(--bg-2)', border: '1.5px solid var(--border-2)',
-            borderRadius: 8, color: 'var(--text)',
-            fontFamily: 'var(--font-sans)', width: '100%',
-            boxSizing: 'border-box',
+            borderRadius: 8, color: 'var(--text)', fontFamily: 'var(--font-sans)',
+            width: '100%', boxSizing: 'border-box' as const,
           }}
         />
         <textarea
@@ -125,26 +117,28 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
           style={{
             marginBottom: 10, fontSize: 13, padding: '8px 12px',
             background: 'var(--bg-2)', border: '1.5px solid var(--border-2)',
-            borderRadius: 8, color: 'var(--text)',
-            fontFamily: 'var(--font-sans)', width: '100%',
-            resize: 'none', boxSizing: 'border-box',
+            borderRadius: 8, color: 'var(--text)', fontFamily: 'var(--font-sans)',
+            width: '100%', resize: 'none' as const, boxSizing: 'border-box' as const,
           }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={submitWrong}
-            disabled={state === 'submitting'}
+            disabled={isSubmitting}
             style={{
               flex: 1, padding: '8px 0', borderRadius: 8,
               background: 'linear-gradient(135deg, #B8860B, #DAA520)',
-              color: '#fff', border: 'none', cursor: 'pointer',
+              color: '#fff', border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting ? 0.6 : 1,
               fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-sans)',
             }}
           >
-            {state === 'submitting' ? 'Đang gửi…' : 'Gửi phản hồi'}
+            {isSubmitting ? 'Đang gửi…' : 'Gửi phản hồi'}
           </button>
           <button
             onClick={() => setState('idle')}
+            disabled={isSubmitting}
             style={{
               padding: '8px 14px', borderRadius: 8,
               background: 'var(--bg-2)', border: '1px solid var(--border-2)',
@@ -159,7 +153,7 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
     )
   }
 
-  // ── Idle / submitting ──
+  // ── Idle ──
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -175,36 +169,35 @@ export default function FeedbackWidget({ appraisalId, stoneName }: FeedbackWidge
 
       <button
         onClick={submitCorrect}
-        disabled={state === 'submitting'}
-        title="Đúng"
+        disabled={isSubmitting}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '6px 12px', borderRadius: 20,
           background: '#ECFDF5', border: '1px solid #6EE7B7',
-          color: '#065F46', cursor: 'pointer', fontSize: 13,
-          fontWeight: 600, fontFamily: 'var(--font-sans)',
+          color: '#065F46', cursor: isSubmitting ? 'not-allowed' : 'pointer',
+          opacity: isSubmitting ? 0.6 : 1,
+          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-sans)',
           transition: 'all .15s',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#D1FAE5' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#ECFDF5' }}
+        onMouseEnter={e => { if (!isSubmitting) (e.currentTarget).style.background = '#D1FAE5' }}
+        onMouseLeave={e => { (e.currentTarget).style.background = '#ECFDF5' }}
       >
         👍 Đúng
       </button>
 
       <button
         onClick={clickWrong}
-        disabled={state === 'submitting'}
-        title="Sai"
+        disabled={isSubmitting}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '6px 12px', borderRadius: 20,
           background: '#FEF2F2', border: '1px solid #FECACA',
-          color: '#991B1B', cursor: 'pointer', fontSize: 13,
-          fontWeight: 600, fontFamily: 'var(--font-sans)',
+          color: '#991B1B', cursor: isSubmitting ? 'not-allowed' : 'pointer',
+          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-sans)',
           transition: 'all .15s',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEE2E2' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2' }}
+        onMouseEnter={e => { if (!isSubmitting) (e.currentTarget).style.background = '#FEE2E2' }}
+        onMouseLeave={e => { (e.currentTarget).style.background = '#FEF2F2' }}
       >
         👎 Sai
       </button>
