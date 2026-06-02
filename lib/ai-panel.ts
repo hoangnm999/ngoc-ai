@@ -487,7 +487,7 @@ export async function runAIPanel(
   const inputTokens  = (r1.status === 'fulfilled' ? r1.value.usage.input_tokens  : 0)
                      + (r2.status === 'fulfilled' ? r2.value.usage.input_tokens  : 0)
   const outputTokens = (r1.status === 'fulfilled' ? r1.value.usage.output_tokens : 0)
-                     + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0)
+                     + (r2.status === 'fulfilled' ? r2.value.usage.output_tokens : 0) 
 
   return {
     sonnet, haiku, gemini, consensus, guard,
